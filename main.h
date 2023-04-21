@@ -3,7 +3,7 @@
 #include <math.h>
 #include "Draw/DrawParticles.hpp"
 
-#define LOGFunction(x) std::cout<<x<<'\n';
+#define LOGFunction(x) // std::cout << x << '\n'
 
 // initial spacing between particles dp in the formulas
 const double dp = 0.0085;
@@ -140,14 +140,20 @@ const double a2 = 1.0 / M_PI / H / H / H;
 
 inline double Wab(double r)
 {
-    r /= H;
+	r /= H;
+    LOGFunction(" a2 ");
+    LOGFunction(a2);
+    LOGFunction("q");
+    LOGFunction(r);
 
-    if (r < 1.0)
-        return (1.0 - 3.0 / 2.0 * r * r + 3.0 / 4.0 * r * r * r) * a2;
-    else if (r < 2.0)
-        return (1.0 / 4.0 * (2.0 - r * r) * (2.0 - r * r) * (2.0 - r * r)) * a2;
-    else
-        return 0.0;
+    LOGFunction("Output Wab \n");
+
+	if (r < 1.0)
+		return (1.0 - 3.0 / 2.0 * r * r + 3.0 / 4.0 * r * r * r) * a2;
+	else if (r < 2.0)
+		return (1.0 / 4.0 * (2.0 - r) * (2.0 - r ) * (2.0 - r)) * a2;
+	else
+		return 0.0;
 }
 
 const double c1 = -3.0 / M_PI / H / H / H / H;
@@ -159,21 +165,20 @@ double W_dap = 0.0;
 
 inline void DWab(Point<3, double> &dx, Point<3, double> &DW, double r, bool print)
 {
-    const double qq = r / H;
+	const double qq = r / H;
 
-    double qq2 = qq * qq;
-    double fac1 = (c1 * qq + d1 * qq2) / r;
-    double b1 = (qq < 1.0) ? 1.0f : 0.0f;
+	double qq2 = qq * qq;
+	double fac1 = (c1 * qq + d1 * qq2) / r;
+	double b1 = (qq < 1.0) ? 1.0f : 0.0f;
 
-    double wqq = (2.0 - qq);
-    double fac2 = c2 * wqq * wqq / r;
-    double b2 = (qq >= 1.0 && qq < 2.0) ? 1.0f : 0.0f;
+	double wqq = (2.0 - qq);
+	double fac2 = c2 * wqq * wqq / r;
+	double b2 = (qq >= 1.0 && qq < 2.0) ? 1.0f : 0.0f;
+	double factor = (b1 * fac1 + b2 * fac2);
 
-    double factor = (b1 * fac1 + b2 * fac2);
-
-    DW.get(0) = factor * dx.get(0);
-    DW.get(1) = factor * dx.get(1);
-    DW.get(2) = factor * dx.get(2);
+	DW.get(0) = factor * dx.get(0);
+	DW.get(1) = factor * dx.get(1);
+	DW.get(2) = factor * dx.get(2);
 }
 
 // Tensile correction
@@ -1289,6 +1294,8 @@ inline void calc_Density(particles &vd, CellList &NN)
     while (it.isNext())
     {
         auto a = it.get();
+        //  initialisiere mit 0
+        vd.getProp<rho>(a) = 0;
         Point<3, double> xa = vd.getPos(a);
         // Take the mass of the particle dependently if it is FLUID or BOUNDARY
         double massa = MassFluid;
@@ -1297,37 +1304,33 @@ inline void calc_Density(particles &vd, CellList &NN)
         // For each neighborhood particle
         while (Np.isNext() == true)
         {
-            // ... q
             auto b = Np.get();
-
-            // Get the position xp of the particle
             Point<3, double> xb = vd.getPos(b);
-
-            // if (p == q) skip this particle
             if (a.getKey() == b)
             {
                 ++Np;
                 continue;
             };
+            double r = sqrt(norm2(xa - xb));
+            LOGFunction("r : ");
+            LOGFunction(r);
 
-            double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
-            double rhob = vd.getProp<rho>(b);
+            LOGFunction("calling Wab : ");
 
-            // Get the distance between p and q
-            Point<3, double> dr = xa - xb;
-            // take the norm of this vector
-            double r2 = norm2(dr);
+            LOGFunction(Wab(r));
+            double ker = Wab(r)     ; 
 
-            // if they interact
-            if (r2 < 4.0 * H * H)
-            {
-                double r = sqrt(r2);
-                Wab(r);
-                vd.getProp<rho>(a) += massb * (Wab(r));
-            }
+            vd.getProp<rho>(a) += ker;
             ++Np;
-            LOGFunction(getProp<rho>(a));
-        };
+        }
+
+        vd.getProp<rho>(a) = vd.getProp<rho>(a) * massa;
+        LOGFunction("rho : ");
+        LOGFunction(vd.getProp<rho>(a));
+        if (vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
+        {
+            to_remove.add(a.getKey());
+        }
         ++it;
     };
 };

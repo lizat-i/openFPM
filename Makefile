@@ -30,7 +30,7 @@ run: sph_dlb_test
 .PHONY: clean all run
 
 clean:
-	rm -f *.o *~ core sph_dlb_test
+	rm -f *.o *~ core sph_dlb log
 	cd  output/
 	rm -rf output/*.vtp output/*.pvtp
 
