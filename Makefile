@@ -4,7 +4,6 @@ LIBS=-fopenmp  /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so -lvcluster -lofpm_pdat
 LIBS_NVCC=-Xcompiler=-fopenmp  -lvcluster -lofpm_pdata -lofpmmemory -lparmetis -lmetis -lboost_iostreams -lboost_program_options -lhdf5 -llibhilbert -lVc     -lrt -lpetsc -lopenblas -lumfpack -lamd -lbtf -lcamd -lccolamd -lcholmod -lcolamd -lcxsparse -lklu -ldl -lrbio -lspqr -lsuitesparseconfig -ldl -lboost_filesystem -lboost_system -L/root/BOOST/lib -lboost_context
 INCLUDE_PATH_NVCC=-Xcompiler=-Wno-deprecated-declarations -Xcompiler=-fopenmp   -I. -I/usr/local/openfpm_numerics/include -I/usr/local/openfpm_pdata/include/config -I/usr/local/openfpm_pdata/include -I/usr/local/openfpm_data/include -I/usr/local/openfpm_vcluster/include -I/usr/local/openfpm_io/include -I/usr/local/openfpm_devices/include -I/root/METIS/include -I/root/PARMETIS/include -I/root/BOOST/include -I/root/HDF5/include -I/root/LIBHILBERT/include   -I/root/PETSC/include -I/root/OPENBLAS/include -I/root/SUITESPARSE/include -I/root/EIGEN -I/root/BLITZ/include -I/root/ALGOIM/include
 
-
 CC=mpic++
 
 LDIR =
