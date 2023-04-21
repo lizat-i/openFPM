@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
   particles vd(0, domain, bc, g, DEC_GRAN(512));
 
 
+
   createBoxAndParseBox(vd, parameters,domain,g);
   vd.map();
 
