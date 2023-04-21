@@ -15,6 +15,7 @@ sph_dlb:
 sph_dlb_test: OPT += -DTEST_RUN
 sph_dlb_test: sph_dlb
 
+
 %.o: %.cpp
 	$(CC) -O3 -g  $(OPT) -g -c --std=c++14 -o $@ $< $(INCLUDE_PATH)
 
@@ -29,5 +30,7 @@ run: sph_dlb_test
 .PHONY: clean all run
 
 clean:
-	rm -f *.o *~ core sph_dlb *.vtp *.pvtp
+	rm -f *.o *~ core sph_dlb_test
+	cd  output/
+	rm -rf output/*.vtp output/*.pvtp
 

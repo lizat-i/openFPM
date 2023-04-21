@@ -1,3 +1,13 @@
+//#define SE_CLASS1
+//#define STOP_ON_ERROR
+#include "Vector/vector_dist.hpp"
+#include <math.h>
+#include "Draw/DrawParticles.hpp"
+// A constant to indicate boundary particles
+#define BOUNDARY 0
+// A constant to indicate fluid particles
+#define FLUID 1
+
 #include "main.h"
 #include <chrono>
 #include <vector>
@@ -201,7 +211,24 @@ int main(int argc, char* argv[])
 		}
 
 		t += dt;
-		
+		if (write < t*500)
+        {
+            // sensor_pressure calculation require ghost and update cell-list
+            vd.map();
+            vd.ghost_get<type,rho,Pressure,velocity>();
+            vd.updateCellList(NN);
+            // calculate the pressure at the sensor points
+            sensor_pressure(vd,NN,press_t,probes);
+            vd.write_frame("output/Geometry",write);
+            write++;
+            if (v_cl.getProcessUnitID() == 0)
+            {std::cout << "TIME: " << t << "  write " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;}
+        }
+        else
+        {
+            if (v_cl.getProcessUnitID() == 0)
+            {std::cout << "TIME: " << t << "  " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "    Max visc: " << max_visc << std::endl;}
+        }
 		stop = std::chrono::high_resolution_clock::now()		;
 		float microseconds = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
 		time_per_timestep.push_back(microseconds)	;
