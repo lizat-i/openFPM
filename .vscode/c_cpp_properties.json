@@ -1,0 +1,36 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/local/openfpm_numerics/include",
+                "/usr/local/openfpm_numerics/include/**",
+                "/usr/local/openfpm_pdata/include/config/**", 
+                "/usr/local/openfpm_pdata/include/**", 
+                "/usr/local/openfpm_data/include/**", 
+                "/usr/local/openfpm_vcluster/include/**", 
+                "/usr/local/openfpm_io/include/**", 
+                "/usr/local/openfpm_devices/include/**", 
+                "/root/METIS/include", 
+                "/root/PARMETIS/include", 
+                "/root/BOOST/include/**", 
+                "/root/HDF5/include/**", 
+                "/root/LIBHILBERT/include/**",  
+                "/root/PETSC/include/**", 
+                "/root/OPENBLAS/include/**", 
+                "/root/SUITESPARSE/include/**", 
+                "/root/EIGEN", 
+                "/root/BLITZ/include", 
+                "/root/ALGOIM/include",
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "ms-vscode.makefile-tools"
+        }
+    ],
+    "version": 4
+}

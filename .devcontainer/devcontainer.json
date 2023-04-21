@@ -1,0 +1,12 @@
+{
+    "name": "openFPMdevcontainer",
+    "image": "openfpm/ubuntu:install20.04",
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+    },
+    "extensions": [
+        // List any extensions you want to install here
+    ]
+}
