@@ -14,8 +14,6 @@
 #include <vector>
 
 
-#define  LOGEnter(x,y) // std::cout<<" Entering function "<< x << " from processor " <<y << "\n"
-#define  LOGExit(x,y)  // std::cout<<" Exiting function "<<  x << " from processor " <<y << "\n"
 
 //std::vector<float> time_per_timestep	;
 //std::chrono::high_resolution_clock::time_point start, stop;
@@ -196,14 +194,14 @@ int main(int argc, char* argv[])
         LOGEnter("Calc_forces",v_cl.getProcessUnitID())     ;
         calc_forces(vd,NN,max_visc) ;
         LOGExit("Calc_forces",v_cl.getProcessUnitID())      ;
-
+        /*
         LOGEnter("calc_Density",v_cl.getProcessUnitID())     ;
-
-        calc_Density(vd, NN)        ;
-
+        */
+        //  calc_Density(vd, NN)                            ;
+        /*
         LOGExit("calc_Density",v_cl.getProcessUnitID())      ;
-
-		// EqState_incompressible(vd,NN,dt,max_visc);
+        */
+		EqState_incompressible(vd,NN,dt,max_visc);
         LOGEnter("EqState",v_cl.getProcessUnitID())     ;
         EqState(vd)             ;
         LOGExit("EqState",v_cl.getProcessUnitID())      ;
@@ -218,19 +216,22 @@ int main(int argc, char* argv[])
         // VerletStep or euler step
         it++;
         if (it < 40)
-            verlet_int_no_densityUpdate(vd,dt);
+            verlet_int(vd,dt);
+            //  verlet_int_no_densityUpdate(vd,dt);
         else
         {
-            euler_intno_densityUpdate(vd,dt);
+            euler_int(vd,dt);
+            //euler_intno_densityUpdate(vd,dt);
             it = 0;
         }
 
         t += dt;
-		if (write < t*10)
+		//if (write < t*100)
+        if (true)
         {
             // sensor_pressure calculation require ghost and update cell-list
             vd.map();
-            //vd.ghost_get<type,rho,Pressure,velocity>();
+            vd.ghost_get<type,rho,Pressure,velocity>();
             vd.updateCellList(NN);
             // calculate the pressure at the sensor points
             //sensor_pressure(vd,NN,press_t,probes);
@@ -248,8 +249,9 @@ int main(int argc, char* argv[])
 		// float microseconds = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
 		// time_per_timestep.push_back(microseconds)	;
 		// std::cout<< "microseconds per loop" << '\n'			;
-		// std::cout<< microseconds << '\n'			;
+		// std::cout<< microseconds << '\n'
     }
+
     openfpm_finalize();
 }
  

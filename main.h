@@ -3,7 +3,9 @@
 #include <math.h>
 #include "Draw/DrawParticles.hpp"
 
-#define LOGFunction(x) // std::cout << x << '\n'
+#define LOGFunction(x) std::cout << x << '\n'
+#define LOGEnter(x, y) std::cout << " Entering function " << x << " from processor " << y << "\n"
+#define LOGExit(x, y) std::cout << " Exiting function " << x << " from processor " << y << "\n"
 
 // initial spacing between particles dp in the formulas
 const double dp = 0.0085;
@@ -40,7 +42,7 @@ const double MassBound = 0.000614125;
 const double t_end = 0.001;
 #else
 // const double t_end = 1.5;
-const double t_end = 0.005;
+const double t_end = 0.50;
 #endif
 
 // Gravity acceleration
@@ -140,20 +142,14 @@ const double a2 = 1.0 / M_PI / H / H / H;
 
 inline double Wab(double r)
 {
-	r /= H;
-    LOGFunction(" a2 ");
-    LOGFunction(a2);
-    LOGFunction("q");
-    LOGFunction(r);
+    r /= H;
 
-    LOGFunction("Output Wab \n");
-
-	if (r < 1.0)
-		return (1.0 - 3.0 / 2.0 * r * r + 3.0 / 4.0 * r * r * r) * a2;
-	else if (r < 2.0)
-		return (1.0 / 4.0 * (2.0 - r) * (2.0 - r ) * (2.0 - r)) * a2;
-	else
-		return 0.0;
+    if (r < 1.0)
+        return (1.0 - 3.0 / 2.0 * r * r + 3.0 / 4.0 * r * r * r) * a2;
+    else if (r < 2.0)
+        return (1.0 / 4.0 * (2.0 - r) * (2.0 - r) * (2.0 - r)) * a2;
+    else
+        return 0.0;
 }
 
 const double c1 = -3.0 / M_PI / H / H / H / H;
@@ -165,20 +161,20 @@ double W_dap = 0.0;
 
 inline void DWab(Point<3, double> &dx, Point<3, double> &DW, double r, bool print)
 {
-	const double qq = r / H;
+    const double qq = r / H;
 
-	double qq2 = qq * qq;
-	double fac1 = (c1 * qq + d1 * qq2) / r;
-	double b1 = (qq < 1.0) ? 1.0f : 0.0f;
+    double qq2 = qq * qq;
+    double fac1 = (c1 * qq + d1 * qq2) / r;
+    double b1 = (qq < 1.0) ? 1.0f : 0.0f;
 
-	double wqq = (2.0 - qq);
-	double fac2 = c2 * wqq * wqq / r;
-	double b2 = (qq >= 1.0 && qq < 2.0) ? 1.0f : 0.0f;
-	double factor = (b1 * fac1 + b2 * fac2);
+    double wqq = (2.0 - qq);
+    double fac2 = c2 * wqq * wqq / r;
+    double b2 = (qq >= 1.0 && qq < 2.0) ? 1.0f : 0.0f;
+    double factor = (b1 * fac1 + b2 * fac2);
 
-	DW.get(0) = factor * dx.get(0);
-	DW.get(1) = factor * dx.get(1);
-	DW.get(2) = factor * dx.get(2);
+    DW.get(0) = factor * dx.get(0);
+    DW.get(1) = factor * dx.get(1);
+    DW.get(2) = factor * dx.get(2);
 }
 
 // Tensile correction
@@ -955,6 +951,7 @@ void verlet_int_no_densityUpdate(particles &vd, double dt)
             vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
         {
             to_remove.add(a.getKey());
+            LOGFunction("particle removed");
         }
 
         vd.template getProp<velocity_prev>(a)[0] = velX;
@@ -1027,6 +1024,7 @@ void euler_intno_densityUpdate(particles &vd, double dt)
             vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
             vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
         {
+            LOGFunction("particle removed");
             to_remove.add(a.getKey());
         }
         vd.template getProp<velocity_prev>(a)[0] = velX;
@@ -1171,6 +1169,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
             {
                 to_remove.add(a.getKey());
             }
+            
             /* Density update */
 
             if (vd.getProp<type>(a) != FLUID)
@@ -1295,6 +1294,12 @@ inline void calc_Density(particles &vd, CellList &NN)
     {
         auto a = it.get();
         //  initialisiere mit 0
+        if (vd.getProp<type>(a) != FLUID)
+        {
+            ++it;
+            continue;
+        }
+
         vd.getProp<rho>(a) = 0;
         Point<3, double> xa = vd.getPos(a);
         // Take the mass of the particle dependently if it is FLUID or BOUNDARY
@@ -1302,6 +1307,7 @@ inline void calc_Density(particles &vd, CellList &NN)
         /* Density update */
         auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
         // For each neighborhood particle
+        double rho_intermidate = 0;
         while (Np.isNext() == true)
         {
             auto b = Np.get();
@@ -1312,23 +1318,30 @@ inline void calc_Density(particles &vd, CellList &NN)
                 continue;
             };
             double r = sqrt(norm2(xa - xb));
-            LOGFunction("r : ");
-            LOGFunction(r);
+            //  LOGFunction("r : ");
+            // LOGFunction(r);
 
-            LOGFunction("calling Wab : ");
+            // LOGFunction("calling Wab : ");
 
-            LOGFunction(Wab(r));
-            double ker = Wab(r)     ; 
+            // LOGFunction(Wab(r));
+            double ker = Wab(r);
 
-            vd.getProp<rho>(a) += ker;
+            rho_intermidate += ker;
+            // vd.getProp<rho>(a) += ker;
             ++Np;
         }
 
-        vd.getProp<rho>(a) = vd.getProp<rho>(a) * massa;
+        vd.getProp<rho>(a) = rho_intermidate * massa;
+
+        LOGFunction("kernel summation : ");
+        LOGFunction(rho_intermidate);
+
         LOGFunction("rho : ");
         LOGFunction(vd.getProp<rho>(a));
+
         if (vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
         {
+            LOGFunction("Dropping particles : ");
             to_remove.add(a.getKey());
         }
         ++it;

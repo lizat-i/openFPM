@@ -57,6 +57,15 @@
         "utility": "cpp",
         "variant": "cpp",
         "*.ipp": "cpp",
-        "test1": "cpp"
+        "test1": "cpp",
+        "csignal": "cpp",
+        "any": "cpp",
+        "codecvt": "cpp",
+        "algorithm": "cpp",
+        "iterator": "cpp",
+        "memory_resource": "cpp",
+        "random": "cpp",
+        "cfenv": "cpp",
+        "cinttypes": "cpp"
     }
 }
