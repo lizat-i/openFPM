@@ -94,8 +94,12 @@ const int velocity = 6;
 
 // velocity at previous step
 const int velocity_prev = 7;
+
+// pressure force at previous step
+const int force_pressure = 8;
+
 // Type of the vector containing particles
-typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3]>> particles;
+typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3]>> particles;
 struct ModelCustom
 {
     template <typename Decomposition, typename vector>
@@ -380,7 +384,7 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
 }
 
 template <typename CellList>
-inline void calc_PressureForcesLoop(particles &vd, CellList &NN, double &max_visc)
+inline void calc_forces_Pressure(particles &vd, CellList &NN, double &max_visc)
 {
     auto part = vd.getDomainIterator();
 
@@ -407,12 +411,6 @@ inline void calc_PressureForcesLoop(particles &vd, CellList &NN, double &max_vis
 
         // Get the Velocity of the particle a
         Point<3, double> va = vd.getProp<velocity>(a);
-
-        // Reset the force counter (- gravity on zeta direction)
-        vd.template getProp<force>(a)[0] = 0.0;
-        vd.template getProp<force>(a)[1] = 0.0;
-        vd.template getProp<force>(a)[2] = -gravity;
-        vd.template getProp<drho>(a) = 0.0;
 
         // We threat FLUID particle differently from BOUNDARY PARTICLES ...
         if (vd.getProp<type>(a) != FLUID)
@@ -466,8 +464,6 @@ inline void calc_PressureForcesLoop(particles &vd, CellList &NN, double &max_vis
                     const double dot = dr.get(0) * dv.get(0) + dr.get(1) * dv.get(1) + dr.get(2) * dv.get(2);
                     const double dot_rr2 = dot / (r2 + Eta2);
                     max_visc = std::max(dot_rr2, max_visc);
-
-                    vd.getProp<drho>(a) += massb * (dv.get(0) * DW.get(0) + dv.get(1) * DW.get(1) + dv.get(2) * DW.get(2));
                 }
 
                 ++Np;
@@ -475,8 +471,6 @@ inline void calc_PressureForcesLoop(particles &vd, CellList &NN, double &max_vis
         }
         else
         {
-            // If it is a fluid particle calculate based on equation 1 and 2
-
             // Get an iterator over the neighborhood particles of p
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
 
@@ -510,25 +504,17 @@ inline void calc_PressureForcesLoop(particles &vd, CellList &NN, double &max_vis
                 if (r2 < 4.0 * H * H)
                 {
                     double r = sqrt(r2);
-
                     Point<3, double> v_rel = va - vb;
-
                     Point<3, double> DW;
                     DWab(dr, DW, r, false);
-
                     double factor = -massb * ((vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob));
-
-                    vd.getProp<force>(a)[0] += factor * DW.get(0);
-                    vd.getProp<force>(a)[1] += factor * DW.get(1);
-                    vd.getProp<force>(a)[2] += factor * DW.get(2);
-
-                    vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
+                    vd.getProp<force_pressure>(a)[0] += factor * DW.get(0);
+                    vd.getProp<force_pressure>(a)[1] += factor * DW.get(1);
+                    vd.getProp<force_pressure>(a)[2] += factor * DW.get(2);
                 }
-
                 ++Np;
             }
         }
-
         ++part;
     }
 }
@@ -566,6 +552,10 @@ inline void calc_forces_withoutPressure(particles &vd, CellList &NN, double &max
         vd.template getProp<force>(a)[0] = 0.0;
         vd.template getProp<force>(a)[1] = 0.0;
         vd.template getProp<force>(a)[2] = -gravity;
+
+        vd.template getProp<force_pressure>(a)[0] = 0.0;
+        vd.template getProp<force_pressure>(a)[1] = 0.0;
+        vd.template getProp<force_pressure>(a)[2] = 0.0;
         vd.template getProp<drho>(a) = 0.0;
 
         // We threat FLUID particle differently from BOUNDARY PARTICLES ...
@@ -680,11 +670,9 @@ inline void calc_forces_withoutPressure(particles &vd, CellList &NN, double &max
 
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                 }
-
                 ++Np;
             }
         }
-
         ++part;
     }
 }
@@ -697,7 +685,9 @@ void max_acceleration_and_velocity(particles &vd, double &max_acc, double &max_v
     {
         auto a = part.get();
 
-        Point<3, double> acc(vd.getProp<force>(a));
+        Point<3, double> acc_f(vd.getProp<force>(a));
+        Point<3, double> acc_p(vd.getProp<force_pressure>(a));
+        Point<3, double> acc = acc_f + acc_p;
         double acc2 = norm2(acc);
 
         Point<3, double> vel(vd.getProp<velocity>(a));
@@ -779,9 +769,9 @@ void verlet_int(particles &vd, double dt)
         }
 
         //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double dx = vd.template getProp<velocity>(a)[0] * dt + vd.template getProp<force>(a)[0] * dt205;
-        double dy = vd.template getProp<velocity>(a)[1] * dt + vd.template getProp<force>(a)[1] * dt205;
-        double dz = vd.template getProp<velocity>(a)[2] * dt + vd.template getProp<force>(a)[2] * dt205;
+        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt205;
+        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt205;
+        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt205;
 
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
@@ -792,9 +782,9 @@ void verlet_int(particles &vd, double dt)
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
 
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<force>(a)[0] * dt2;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<force>(a)[1] * dt2;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<force>(a)[2] * dt2;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt2;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt2;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt2;
         vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
         // Check if the particle go out of range in space and in density
@@ -809,7 +799,9 @@ void verlet_int(particles &vd, double dt)
         vd.template getProp<velocity_prev>(a)[1] = velY;
         vd.template getProp<velocity_prev>(a)[2] = velZ;
         vd.template getProp<rho_prev>(a) = rhop;
-
+        // TODO Zero drho in integration
+        vd.template getProp<drho>(a) = 0.0;
+        ;
         ++part;
     }
 
@@ -854,9 +846,9 @@ void euler_int(particles &vd, double dt)
             continue;
         }
         //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double dx = vd.template getProp<velocity>(a)[0] * dt + vd.template getProp<force>(a)[0] * dt205;
-        double dy = vd.template getProp<velocity>(a)[1] * dt + vd.template getProp<force>(a)[1] * dt205;
-        double dz = vd.template getProp<velocity>(a)[2] * dt + vd.template getProp<force>(a)[2] * dt205;
+        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt205;
+        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt205;
+        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt205;
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
         vd.getPos(a)[2] += dz;
@@ -864,9 +856,9 @@ void euler_int(particles &vd, double dt)
         double velY = vd.template getProp<velocity>(a)[1];
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + vd.template getProp<force>(a)[0] * dt;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + vd.template getProp<force>(a)[1] * dt;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + vd.template getProp<force>(a)[2] * dt;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
         vd.template getProp<rho>(a) = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
         // Check if the particle go out of range in space and in density
         if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
@@ -879,6 +871,10 @@ void euler_int(particles &vd, double dt)
         vd.template getProp<velocity_prev>(a)[1] = velY;
         vd.template getProp<velocity_prev>(a)[2] = velZ;
         vd.template getProp<rho_prev>(a) = rhop;
+        // TODO Zero drho in integration
+        vd.template getProp<drho>(a) = 0.0;
+        vd.template getProp<Pressure>(a) = 0.0;
+
         ++part;
     }
     // remove the particles
@@ -927,9 +923,9 @@ void verlet_int_no_densityUpdate(particles &vd, double dt)
         }
 
         //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double dx = vd.template getProp<velocity>(a)[0] * dt + vd.template getProp<force>(a)[0] * dt205;
-        double dy = vd.template getProp<velocity>(a)[1] * dt + vd.template getProp<force>(a)[1] * dt205;
-        double dz = vd.template getProp<velocity>(a)[2] * dt + vd.template getProp<force>(a)[2] * dt205;
+        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt205;
+        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt205;
+        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt205;
 
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
@@ -940,9 +936,9 @@ void verlet_int_no_densityUpdate(particles &vd, double dt)
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
 
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<force>(a)[0] * dt2;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<force>(a)[1] * dt2;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<force>(a)[2] * dt2;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt2;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt2;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt2;
         // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
         // Check if the particle go out of range in space and in density
@@ -1005,9 +1001,9 @@ void euler_intno_densityUpdate(particles &vd, double dt)
             continue;
         }
         //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double dx = vd.template getProp<velocity>(a)[0] * dt + vd.template getProp<force>(a)[0] * dt205;
-        double dy = vd.template getProp<velocity>(a)[1] * dt + vd.template getProp<force>(a)[1] * dt205;
-        double dz = vd.template getProp<velocity>(a)[2] * dt + vd.template getProp<force>(a)[2] * dt205;
+        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt205;
+        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt205;
+        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt205;
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
         vd.getPos(a)[2] += dz;
@@ -1015,9 +1011,9 @@ void euler_intno_densityUpdate(particles &vd, double dt)
         double velY = vd.template getProp<velocity>(a)[1];
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + vd.template getProp<force>(a)[0] * dt;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + vd.template getProp<force>(a)[1] * dt;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + vd.template getProp<force>(a)[2] * dt;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
         // vd.template getProp<rho>(a) = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
         //  Check if the particle go out of range in space and in density
         if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
@@ -1098,192 +1094,188 @@ inline void sensor_pressure(Vector &vd,
     }
 }
 template <typename CellList>
-inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, double &max_visc)
+inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, double &max_visc, double &rel_rho_predicted_error_max)
 {
-    double error = 0;
-    double error_min = 0.01;
-    int min_itteration = 3;
-    int iter = 0;
-
+    double pressureKoefficient = 1;
     double dt205 = dt * dt * 0.5;
     double dt2 = dt * 2.0;
-    double rho_predicted_variation;
-
+    double rho_predicted_error;
+    double delta_pressure;
     auto it = vd.getDomainIterator();
 
-    // whiler max_error > something do
-    while ((error > error_min) || (iter < min_itteration))
+    // Initialize pressure force
+
+    double fx_pressure_force = 0;
+    double fy_pressure_force = 0;
+    double fz_pressure_force = 0;
+
+    while (it.isNext())
     {
-        while (it.isNext())
+        /* Velocity and Position block */
+        auto a = it.get();
+
+        Point<3, double> xa = vd.getPos(a);
+        // Take the mass of the particle dependently if it is FLUID or BOUNDARY
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
+
+        // Get the density of the of the particle a
+        double rhoa = vd.getProp<rho>(a);
+
+        // Get the pressure of the particle a
+        double Pa = vd.getProp<Pressure>(a);
+
+        // Get the Velocity of the particle a
+        Point<3, double> va = vd.getProp<velocity>(a);
+
+        double fx_without_pressure = vd.template getProp<force>(a)[0];
+        double fy_without_pressure = vd.template getProp<force>(a)[1];
+        double fz_without_pressure = vd.template getProp<force>(a)[2];
+
+        // 	get and update velocity
+        /*
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (fx_without_pressure + fx_pressure_force) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (fy_without_pressure + fy_pressure_force) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (fz_without_pressure + fz_pressure_force) * dt  ;
+        */
+
+        // 	Predict velocity
+
+        double v_pred = vd.template getProp<velocity>(a)[0] + (fx_without_pressure + fx_pressure_force) * dt;
+        double v_pred = vd.template getProp<velocity>(a)[1] + (fy_without_pressure + fy_pressure_force) * dt;
+        double v_pred = vd.template getProp<velocity>(a)[2] + (fz_without_pressure + fz_pressure_force) * dt;
+
+        //  Predict spatial Coordinates
+
+        double x_pred = vd.getPos(a)[0] + vd.template getProp<velocity>(a)[0] * dt + (fx_without_pressure + fx_pressure_force) * dt205;
+        double y_pred = vd.getPos(a)[1] + vd.template getProp<velocity>(a)[1] * dt + (fy_without_pressure + fy_pressure_force) * dt205;
+        double z_pred = vd.getPos(a)[2] + vd.template getProp<velocity>(a)[2] * dt + (fz_without_pressure + fz_pressure_force) * dt205;
+
+        /*
+        vd.getPos(a)[0] += dx;
+        vd.getPos(a)[1] += dy;
+        vd.getPos(a)[2] += dz;
+        */
+
+        /*
+        drho update
+        currently boundary and fluid particles are treated the same!
+        */
+        if (vd.getProp<type>(a) != FLUID)
         {
-            /* Velocity and Position block */
-            auto a = it.get();
+            // If it is a boundary particle calculate the delta rho based on equation 2
+            // This require to run across the neighborhoods particles of a
+            auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
 
-            Point<3, double> xa = vd.getPos(a);
-            // Take the mass of the particle dependently if it is FLUID or BOUNDARY
-            double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
-
-            // Get the density of the of the particle a
-            double rhoa = vd.getProp<rho>(a);
-
-            // Get the pressure of the particle a
-            double Pa = vd.getProp<Pressure>(a);
-
-            // Get the Velocity of the particle a
-            Point<3, double> va = vd.getProp<velocity>(a);
-
-            double fx_without_pressure = vd.template getProp<force>(a)[0];
-            double fy_without_pressure = vd.template getProp<force>(a)[1];
-            double fz_without_pressure = vd.template getProp<force>(a)[2];
-
-            double fx_pressure_force = 0;
-            double fy_pressure_force = 0;
-            double fz_pressure_force = 0;
-
-            double pressure = 0;
-            vd.template getProp<drho>(a) = 0.0;
-
-            // 	get and update velocity
-
-            vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (fx_without_pressure + fx_pressure_force) * dt;
-            vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (fy_without_pressure + fy_pressure_force) * dt;
-            vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (fz_without_pressure + fz_pressure_force) * dt;
-
-            //	Calculate displacement and update position
-
-            double dx = vd.template getProp<velocity>(a)[0] * dt + (fx_without_pressure + fx_pressure_force) * dt205;
-            double dy = vd.template getProp<velocity>(a)[1] * dt + (fy_without_pressure + fy_pressure_force) * dt205;
-            double dz = vd.template getProp<velocity>(a)[2] * dt + (fz_without_pressure + fz_pressure_force) * dt205;
-
-            vd.getPos(a)[0] += dx;
-            vd.getPos(a)[1] += dy;
-            vd.getPos(a)[2] += dz;
-
-            // Check if the particle go out of range in space and in density
-            /*
-            need to check if this is necesarry
-            */
-            if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
-                vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
-                vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
+            // For each neighborhood particle
+            while (Np.isNext() == true)
             {
-                to_remove.add(a.getKey());
-            }
-            
-            /* Density update */
+                // ... q
+                auto b = Np.get();
 
-            if (vd.getProp<type>(a) != FLUID)
-            {
-                // If it is a boundary particle calculate the delta rho based on equation 2
-                // This require to run across the neighborhoods particles of a
-                auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
+                // Get the position xp of the particle
+                Point<3, double> xb = vd.getPos(b);
 
-                // For each neighborhood particle
-                while (Np.isNext() == true)
+                // if (p == q) skip this particle
+                if (a.getKey() == b)
                 {
-                    // ... q
-                    auto b = Np.get();
-
-                    // Get the position xp of the particle
-                    Point<3, double> xb = vd.getPos(b);
-
-                    // if (p == q) skip this particle
-                    if (a.getKey() == b)
-                    {
-                        ++Np;
-                        continue;
-                    };
-
-                    // get the mass of the particle
-                    double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
-
-                    // Get the velocity of the particle b
-                    Point<3, double> vb = vd.getProp<velocity>(b);
-
-                    // Get the pressure and density of particle b
-                    double Pb = vd.getProp<Pressure>(b);
-                    double rhob = vd.getProp<rho>(b);
-
-                    // Get the distance between p and q
-                    Point<3, double> dr = xa - xb;
-
-                    // take the norm of this vector
-                    double r2 = norm2(dr);
-
-                    // If the particles interact ...
-                    if (r2 < 4.0 * H * H)
-                    {
-                        // ... calculate delta rho
-                        double r = sqrt(r2);
-                        Wab(r);
-                        /*
-                        Point<3, double> dv = va - vb;
-
-                        Point<3, double> DW;
-
-                        DWab(dr, DW, r, false);
-
-                        const double dot = dr.get(0) * dv.get(0) + dr.get(1) * dv.get(1) + dr.get(2) * dv.get(2);
-                        const double dot_rr2 = dot / (r2 + Eta2);
-                        max_visc = std::max(dot_rr2, max_visc);
-
-                        vd.getProp<drho>(a) += massb * (dv.get(0) * DW.get(0) + dv.get(1) * DW.get(1) + dv.get(2) * DW.get(2));
-                        */
-                        vd.getProp<rho>(a) += massb * (Wab(r));
-                    }
                     ++Np;
-                }
-            }
-            else
-            {
-                // Get an iterator over the neighborhood particles of p
-                auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
+                    continue;
+                };
 
-                // For each neighborhood particle
-                while (Np.isNext() == true)
+                // get the mass of the particle
+                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+
+                // Get the velocity of the particle b
+                Point<3, double> vb = vd.getProp<velocity>(b);
+
+                // Get the pressure and density of particle b
+                double Pb = vd.getProp<Pressure>(b);
+                double rhob = vd.getProp<rho>(b);
+
+                // Get the distance between p and q
+                Point<3, double> dr = xa - xb;
+
+                // take the norm of this vector
+                double r2 = norm2(dr);
+
+                // If the particles interact ...
+                if (r2 < 4.0 * H * H)
                 {
-                    // ... q
-                    auto b = Np.get();
+                    // ... calculate delta rho
+                    double r = sqrt(r2);
+                    Wab(r);
+                    Point<3, double> dv = va - vb;
 
-                    // Get the position xp of the particle
-                    Point<3, double> xb = vd.getPos(b);
+                    Point<3, double> DW;
 
-                    // if (p == q) skip this particle
-                    if (a.getKey() == b)
-                    {
-                        ++Np;
-                        continue;
-                    };
+                    DWab(dr, DW, r, false);
 
-                    double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
-                    Point<3, double> vb = vd.getProp<velocity>(b);
-                    double Pb = vd.getProp<Pressure>(b);
-                    double rhob = vd.getProp<rho>(b);
+                    const double dot = dr.get(0) * dv.get(0) + dr.get(1) * dv.get(1) + dr.get(2) * dv.get(2);
+                    const double dot_rr2 = dot / (r2 + Eta2);
+                    max_visc = std::max(dot_rr2, max_visc);
 
-                    // Get the distance between p and q
-                    Point<3, double> dr = xa - xb;
-                    // take the norm of this vector
-                    double r2 = norm2(dr);
-
-                    // if they interact
-                    if (r2 < 4.0 * H * H)
-                    {
-                        double r = sqrt(r2);
-
-                        Point<3, double> v_rel = va - vb;
-
-                        Point<3, double> DW;
-                        DWab(dr, DW, r, false);
-
-                        vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
-                    }
-                    ++Np;
+                    vd.getProp<drho>(a) += massb * (dv.get(0) * DW.get(0) + dv.get(1) * DW.get(1) + dv.get(2) * DW.get(2));
+                    // vd.getProp<rho>(a) += massb * (Wab(r));
                 }
+                ++Np;
             }
-            double rho_predicted = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt2;
-            rho_predicted_variation = std::abs((rho_predicted - rho_zero) / rho_zero);
-        };
-        error = std::max(error, rho_predicted_variation);
+        }
+        else
+        {
+            // Get an iterator over the neighborhood particles of p
+            auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
+
+            // For each neighborhood particle
+            while (Np.isNext() == true)
+            {
+                // ... q
+                auto b = Np.get();
+
+                // Get the position xp of the particle
+                Point<3, double> xb = vd.getPos(b);
+
+                // if (p == q) skip this particle
+                if (a.getKey() == b)
+                {
+                    ++Np;
+                    continue;
+                };
+
+                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+                Point<3, double> vb = vd.getProp<velocity>(b);
+                double Pb = vd.getProp<Pressure>(b);
+                double rhob = vd.getProp<rho>(b);
+
+                // Get the distance between p and q
+                Point<3, double> dr = xa - xb;
+                // take the norm of this vector
+                double r2 = norm2(dr);
+
+                // if they interact
+                if (r2 < 4.0 * H * H)
+                {
+                    double r = sqrt(r2);
+
+                    Point<3, double> v_rel = va - vb;
+
+                    Point<3, double> DW;
+                    DWab(dr, DW, r, false);
+
+                    vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
+                }
+                ++Np;
+            }
+        }
+
+        double rho_predicted = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt2;
+        rho_predicted_error = rho_predicted - rho_zero;
+
+        // Keep track of max error
+        rel_rho_predicted_error_max = std::max(rel_rho_predicted_error_max, std::abs(rho_predicted_error / rho_zero));
+
+        // Update Pressure using predicted density error and pressure coeeficient
+        delta_pressure = pressureKoefficient * rho_predicted_error;
+        vd.getProp<Pressure>(a) += delta_pressure;
     };
 };
 template <typename CellList>
