@@ -26,13 +26,8 @@ int main(int argc, char *argv[])
     probes.add({0.8779, 0.3, 0.02});
     probes.add({0.754, 0.31, 0.02});
     
-    Box<3, double> domain({-0.1, -0.1, -0.1}, {1.8010, 0.8065, 0.6025});
-
-    size_t nrPartX = size_t(std::floor((1.8 +0.1)/dp));
-    size_t nrPartY = size_t(std::floor((0.8 +0.1)/dp));
-    size_t nrPartZ = size_t(std::floor((0.6 +0.1)/dp));
-    
-    size_t sz[3] = {nrPartX, nrPartY, nrPartZ};
+	Box<3,double> domain({-0.05,-0.05,-0.05},{1.7010,0.7065,0.5025});
+	size_t sz[3] = {207,90,66};
 
     // Fill W_dap
     W_dap = 1.0 / Wab(H / 1.5);
@@ -44,7 +39,8 @@ int main(int argc, char *argv[])
     Ghost<3, double> g(2 * H);
 
     particles vd(0, domain, bc, g, DEC_GRAN(512));
-    Box<3, double> fluid_box({dp / 2.0, dp / 2.0, dp / 2.0}, {0.4 + dp / 2.0, 0.67 - dp / 2.0, 0.3 + dp / 2.0});
+    
+    Box<3,double> fluid_box({dp/2.0,dp/2.0,dp/2.0},{0.4+dp/2.0,0.67-dp/2.0,0.3+dp/2.0});
 
     // return an iterator to the fluid particles to add to vd
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
@@ -89,17 +85,25 @@ int main(int argc, char *argv[])
     //Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
     //Box<3, double> recipient2({dp, dp, dp}, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
 
-    Box<3, double> recipient1({0.0 -3*dp, 0.0 -3*dp, 0.0 -3.0*dp}, {1.6 + dp *3.0   , 0.67 + dp * 3.0, 0.4  });
-    Box<3, double> recipient2({dp, dp, dp},                        {1.6 - dp / 2.0  , 0.67 - dp / 2.0, 0.4  });
+    Box<3, double> recipient1({0.0 -3*dp, 0.0 -3*dp, 0.0 -3.0*dp}, {1.6 + dp *3.0   , 0.67 + dp * 3.0, 0.4-dp/2  });
+    Box<3, double> recipient2({dp, dp, dp},                        {1.6 - dp / 2.0  , 0.67 - dp / 2.0, 0.4+dp/2  });
 
-    Box<3, double> obstacle1({0.9       , 0.24 - dp / 2.0   , 0.0-3*dp}, {1.02 + dp / 2.0, 0.36,         0.45 + dp / 2.0 });
-    Box<3, double> obstacle2({0.9 + dp  , 0.24 + dp / 2.0   , 0.0-3*dp}, {1.02 - dp / 2.0, 0.36 - dp,    0.45 - dp / 2.0 });
-    Box<3, double> obstacle3({0.9 + dp  , 0.24              , 0.0-3*dp}, {1.02           , 0.36,         0.45            });
+    Box<3, double> obstacle1({0.9       , 0.24 - dp / 2.0   , 0.0   }, {1.02 + dp / 2.0, 0.36,         0.45 - dp / 2.0 });
+    Box<3, double> obstacle2({0.9 + dp  , 0.24 + dp / 2.0   , 0.0   }, {1.02 - dp / 2.0, 0.36 - dp,    0.45 + dp / 2.0 });
+    Box<3, double> obstacle3({0.9 + dp  , 0.24              , 0.0   }, {1.02           , 0.36,         0.45            });
+    
+    /*
+    Box<3,double> recipient1({0.0,0.0,0.0},{1.6+dp/2.0,0.67+dp/2.0,0.4+dp/2.0})         ;
+    Box<3,double> recipient2({dp,dp,dp},{1.6-dp/2.0,0.67-dp/2.0,0.4+dp/2.0})            ;
+    Box<3,double> obstacle1({0.9,0.24-dp/2.0,0.0},{1.02+dp/2.0,0.36,0.45+dp/2.0})       ;
+    Box<3,double> obstacle2({0.9+dp,0.24+dp/2.0,0.0},{1.02-dp/2.0,0.36-dp,0.45-dp/2.0}) ;
+    Box<3,double> obstacle3({0.9+dp,0.24,0.0},{1.02,0.36,0.45});
+    */
 
     openfpm::vector<Box<3, double>> holes;
     LOGFunction("creating holes");
     holes.add(recipient2);
-    LOGFunction("add recipients ");
+    //LOGFunction("add recipients ");
     holes.add(obstacle1);
     LOGFunction("add obstacles ");
     auto bound_box = DrawParticles::DrawSkin(vd, sz, domain, holes, recipient1);
@@ -125,7 +129,12 @@ int main(int argc, char *argv[])
 
         ++bound_box;
     }
-    auto obstacle_box = DrawParticles::DrawSkin(vd, sz, domain, obstacle2, obstacle1);
+    //auto obstacle_box = DrawParticles::DrawSkin(vd, sz, domain, obstacle2, obstacle1);
+
+    //openfpm::vector<Box<3, double>> obstacle_box;
+    //obstacle_box.add(obstacle1);
+
+    auto obstacle_box = DrawParticles::DrawBox(vd,sz,domain,obstacle1);
 
     while (obstacle_box.isNext())
     {
