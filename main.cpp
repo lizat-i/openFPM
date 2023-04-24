@@ -25,9 +25,14 @@ int main(int argc, char *argv[])
 
     probes.add({0.8779, 0.3, 0.02});
     probes.add({0.754, 0.31, 0.02});
+    
+    Box<3, double> domain({-0.1, -0.1, -0.1}, {1.8010, 0.8065, 0.6025});
 
-    Box<3, double> domain({-0.05, -0.05, -0.05}, {1.7010, 0.7065, 0.5025});
-    size_t sz[3] = {207, 90, 66};
+    size_t nrPartX = size_t(std::floor((1.8 +0.1)/dp));
+    size_t nrPartY = size_t(std::floor((0.8 +0.1)/dp));
+    size_t nrPartZ = size_t(std::floor((0.6 +0.1)/dp));
+    
+    size_t sz[3] = {nrPartX, nrPartY, nrPartZ};
 
     // Fill W_dap
     W_dap = 1.0 / Wab(H / 1.5);
@@ -80,18 +85,25 @@ int main(int argc, char *argv[])
     }
 
     // Recipient
-    Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
-    Box<3, double> recipient2({dp, dp, dp}, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
+    
+    //Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
+    //Box<3, double> recipient2({dp, dp, dp}, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
 
-    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2.0});
-    Box<3, double> obstacle2({0.9 + dp, 0.24 + dp / 2.0, 0.0}, {1.02 - dp / 2.0, 0.36 - dp, 0.45 - dp / 2.0});
-    Box<3, double> obstacle3({0.9 + dp, 0.24, 0.0}, {1.02, 0.36, 0.45});
+    Box<3, double> recipient1({0.0 -3*dp, 0.0 -3*dp, 0.0 -3.0*dp}, {1.6 + dp *3.0   , 0.67 + dp * 3.0, 0.4  });
+    Box<3, double> recipient2({dp, dp, dp},                        {1.6 - dp / 2.0  , 0.67 - dp / 2.0, 0.4  });
+
+    Box<3, double> obstacle1({0.9       , 0.24 - dp / 2.0   , 0.0-3*dp}, {1.02 + dp / 2.0, 0.36,         0.45 + dp / 2.0 });
+    Box<3, double> obstacle2({0.9 + dp  , 0.24 + dp / 2.0   , 0.0-3*dp}, {1.02 - dp / 2.0, 0.36 - dp,    0.45 - dp / 2.0 });
+    Box<3, double> obstacle3({0.9 + dp  , 0.24              , 0.0-3*dp}, {1.02           , 0.36,         0.45            });
 
     openfpm::vector<Box<3, double>> holes;
+    LOGFunction("creating holes");
     holes.add(recipient2);
+    LOGFunction("add recipients ");
     holes.add(obstacle1);
+    LOGFunction("add obstacles ");
     auto bound_box = DrawParticles::DrawSkin(vd, sz, domain, holes, recipient1);
-
+    LOGFunction("DrawSkin ");
     while (bound_box.isNext())
     {
         vd.add();
@@ -154,6 +166,7 @@ int main(int argc, char *argv[])
     size_t write = 0;
     size_t it = 0;
     size_t it_reb = 0;
+    size_t timestep = 0;
     double t = 0.0;
 
     double dt = DtMin;
@@ -183,7 +196,30 @@ int main(int argc, char *argv[])
 
         // Calc all forces but pressure
         calc_forces_withoutPressure(vd, NN, max_visc);
-        LOGEnter("Calc_forces", v_cl.getProcessUnitID());
+        LOGExit("Calc_forces", v_cl.getProcessUnitID());
+        /*
+        old main
+        calc_forces(vd,NN,max_visc) ;
+        EqState(vd)             ;
+        */
+        // Get the maximum viscosity term across processors
+        v_cl.max(max_visc);
+        v_cl.execute();
+
+        // Calculate delta t integration
+        double dt = calc_deltaT(vd, max_visc);
+        // VerletStep or euler step
+        it++;
+
+        if (it < 40)
+            verlet_int(vd, dt);
+        //  verlet_int_no_densityUpdate(vd,dt);
+        else
+        {
+            euler_int(vd, dt);
+            // euler_intno_densityUpdate(vd,dt);
+            it = 0;
+        }
 
         double error_min = 0.01;
         int min_itteration = 3;
@@ -197,38 +233,22 @@ int main(int argc, char *argv[])
             LOGEnter("EqState", v_cl.getProcessUnitID());
         
             EqState_incompressible(vd, NN, dt, max_visc ,rel_rho_predicted_error_max);
-            calc_forces_Pressure(vd,NN,max_visc) ;
-            
+
             LOGExit("EqState", v_cl.getProcessUnitID());
-        }
-        LOGExit("Calc_forces", v_cl.getProcessUnitID());
+            LOGEnter("entering  pressure force", v_cl.getProcessUnitID());
+            calc_forces_Pressure(vd,NN,max_visc) ;
+            LOGExit("leaving  pressure force", v_cl.getProcessUnitID());
 
-
-
-        /*
-        old main
-        calc_forces(vd,NN,max_visc) ;
-        EqState(vd)             ;
-        */
-        // Get the maximum viscosity term across processors
-        v_cl.max(max_visc);
-        v_cl.execute();
-
-        // Calculate delta t integration
-        double dt = calc_deltaT(vd, max_visc);
-
-        // VerletStep or euler step
-        it++;
-        if (it < 40)
-            verlet_int(vd, dt);
-        //  verlet_int_no_densityUpdate(vd,dt);
-        else
-        {
-            euler_int(vd, dt);
-            // euler_intno_densityUpdate(vd,dt);
-            it = 0;
+            LOGDouble("predicted error = ", rel_rho_predicted_error_max);
+            LOGDouble("pressure iteration  = ", iter)   ;
+            LOGFunction("Leaving Pressure iteration")  ;
+            ++iter;
+            if (iter>25){break;}
         }
 
+
+
+        timestep +=1;
         t += dt;
         // if (write < t*100)
         if (true)
@@ -253,11 +273,7 @@ int main(int argc, char *argv[])
                 std::cout << "TIME: " << t << "  " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "    Max visc: " << max_visc << std::endl;
             }
         }
-        // stop = std::chrono::high_resolution_clock::now()		;
-        // float microseconds = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-        // time_per_timestep.push_back(microseconds)	;
-        // std::cout<< "microseconds per loop" << '\n'			;
-        // std::cout<< microseconds << '\n'
+        //if (timestep > 2){break;};
     }
 
     openfpm_finalize();
