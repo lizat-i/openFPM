@@ -263,15 +263,15 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                     kernel += wab;
                     rho_wab += rhob * wab;
                     p_wab += pressure_b * wab;
-                    g_wab += (wab * rhob * (-9.81));
+                    g_wab += (wab * rhob * (-9.81)*dr.get(2));
                 }
 
                 ++Np;
             }
             // Pressure and density calclation Boundary Particle
 
-            vd.getProp<rho>(a) = (kernel > eps) ? rho_wab / kernel : rhoa;
-            vd.getProp<Pressure>(a) = (kernel > eps) ? (p_wab + g_wab)/ kernel : Pa;
+            vd.getProp<rho>(a) = (kernel > eps) ? rho_wab / kernel : rho_zero;
+            vd.getProp<Pressure>(a) = (kernel > eps) ? (p_wab + g_wab)/ kernel : 0.0;
         }
         else
         {
@@ -715,7 +715,7 @@ int main(int argc, char *argv[])
             sensor_pressure(vd, NN, press_t, probes);
             vd.write_frame("output/Geometry", write);
             it_reb = 0;
-            ++write;
+            //++write;
             
             if (v_cl.getProcessUnitID() == 0)
             {
