@@ -1,5 +1,5 @@
-//#define SE_CLASS1
-//#define STOP_ON_ERROR
+// #define SE_CLASS1
+// #define STOP_ON_ERROR
 #include "Vector/vector_dist.hpp"
 #include <math.h>
 #include "Draw/DrawParticles.hpp"
@@ -12,229 +12,279 @@
 #include <chrono>
 #include <vector>
 
-std::vector<float> time_per_timestep	;
-std::chrono::high_resolution_clock::time_point start, stop;
+// std::vector<float> time_per_timestep	;
+// std::chrono::high_resolution_clock::time_point start, stop;
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
 
-	openfpm_init(&argc,&argv);
+    openfpm_init(&argc, &argv);
 
+    openfpm::vector<openfpm::vector<double>> press_t;
+    openfpm::vector<Point<3, double>> probes;
 
-	openfpm::vector<openfpm::vector<double>> press_t;
-	openfpm::vector<Point<3,double>> probes;
-
-	probes.add({0.8779,0.3,0.02});
-	probes.add({0.754,0.31,0.02});
-
+    probes.add({0.8779, 0.3, 0.02});
+    probes.add({0.754, 0.31, 0.02});
+    
 	Box<3,double> domain({-0.05,-0.05,-0.05},{1.7010,0.7065,0.5025});
 	size_t sz[3] = {207,90,66};
 
-	// Fill W_dap
-	W_dap = 1.0/Wab(H/1.5);
+    // Fill W_dap
+    W_dap = 1.0 / Wab(H / 1.5);
 
-	// Here we define the boundary conditions of our problem
-    size_t bc[3]={NON_PERIODIC,NON_PERIODIC,NON_PERIODIC};
+    // Here we define the boundary conditions of our problem
+    size_t bc[3] = {NON_PERIODIC, NON_PERIODIC, NON_PERIODIC};
 
-	// extended boundary around the domain, and the processor domain
-	Ghost<3,double> g(2*H);
+    // extended boundary around the domain, and the processor domain
+    Ghost<3, double> g(2 * H);
 
-	particles vd(0,domain,bc,g,DEC_GRAN(512));
-	Box<3,double> fluid_box({dp/2.0,dp/2.0,dp/2.0},{0.4+dp/2.0,0.67-dp/2.0,0.3+dp/2.0});
+    particles vd(0, domain, bc, g, DEC_GRAN(512));
+    
+    Box<3,double> fluid_box({dp/2.0,dp/2.0,dp/2.0},{0.4+dp/2.0,0.67-dp/2.0,0.3+dp/2.0});
 
-	// return an iterator to the fluid particles to add to vd
-	auto fluid_it = DrawParticles::DrawBox(vd,sz,domain,fluid_box);
+    // return an iterator to the fluid particles to add to vd
+    auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
 
-	// here we fill some of the constants needed by the simulation
-	max_fluid_height = fluid_it.getBoxMargins().getHigh(2);
-	h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
-	B = (coeff_sound)*(coeff_sound)*gravity*h_swl*rho_zero / gamma_;
-	cbar = coeff_sound * sqrt(gravity * h_swl);
+    // here we fill some of the constants needed by the simulation
+    max_fluid_height = fluid_it.getBoxMargins().getHigh(2);
+    h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
+    B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
+    cbar = coeff_sound * sqrt(gravity * h_swl);
 
-	// for each particle inside the fluid box ...
-	while (fluid_it.isNext())
-	{
-		// ... add a particle ...
-		vd.add();
+    // for each particle inside the fluid box ...
+    while (fluid_it.isNext())
+    {
+        // ... add a particle ...
+        vd.add();
 
-		// ... and set it position ...
-		vd.getLastPos()[0] = fluid_it.get().get(0);
-		vd.getLastPos()[1] = fluid_it.get().get(1);
-		vd.getLastPos()[2] = fluid_it.get().get(2);
+        // ... and set it position ...
+        vd.getLastPos()[0] = fluid_it.get().get(0);
+        vd.getLastPos()[1] = fluid_it.get().get(1);
+        vd.getLastPos()[2] = fluid_it.get().get(2);
 
-		// and its type.
-		vd.template getLastProp<type>() = FLUID;
-		vd.template getLastProp<Pressure>() = rho_zero * gravity *  (max_fluid_height - fluid_it.get().get(2));
+        // and its type.
+        vd.template getLastProp<type>() = FLUID;
+        vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
 
-		vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0/gamma_) * rho_zero;
-		vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
-		vd.template getLastProp<velocity>()[0] = 0.0;
-		vd.template getLastProp<velocity>()[1] = 0.0;
-		vd.template getLastProp<velocity>()[2] = 0.0;
+        vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
+        vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
+        vd.template getLastProp<velocity>()[0] = 0.0;
+        vd.template getLastProp<velocity>()[1] = 0.0;
+        vd.template getLastProp<velocity>()[2] = 0.0;
 
-		vd.template getLastProp<velocity_prev>()[0] = 0.0;
-		vd.template getLastProp<velocity_prev>()[1] = 0.0;
-		vd.template getLastProp<velocity_prev>()[2] = 0.0;
+        vd.template getLastProp<velocity_prev>()[0] = 0.0;
+        vd.template getLastProp<velocity_prev>()[1] = 0.0;
+        vd.template getLastProp<velocity_prev>()[2] = 0.0;
 
-		// next fluid particle
-		++fluid_it;
-	}
+        // next fluid particle
+        ++fluid_it;
+    }
 
-	// Recipient
-	Box<3,double> recipient1({0.0,0.0,0.0},{1.6+dp/2.0,0.67+dp/2.0,0.4+dp/2.0});
-	Box<3,double> recipient2({dp,dp,dp},{1.6-dp/2.0,0.67-dp/2.0,0.4+dp/2.0});
+    // Recipient
+    
+    //Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
+    //Box<3, double> recipient2({dp, dp, dp}, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
 
-	Box<3,double> obstacle1({0.9,0.24-dp/2.0,0.0},{1.02+dp/2.0,0.36,0.45+dp/2.0});
-	Box<3,double> obstacle2({0.9+dp,0.24+dp/2.0,0.0},{1.02-dp/2.0,0.36-dp,0.45-dp/2.0});
-	Box<3,double> obstacle3({0.9+dp,0.24,0.0},{1.02,0.36,0.45});
+    Box<3, double> recipient1({0.0 -3*dp, 0.0 -3*dp, 0.0 -3.0*dp}, {1.6 + dp *3.0   , 0.67 + dp * 3.0, 0.4-dp/2  });
+    Box<3, double> recipient2({dp, dp, dp},                        {1.6 - dp / 2.0  , 0.67 - dp / 2.0, 0.4+dp/2  });
 
-	openfpm::vector<Box<3,double>> holes;
-	holes.add(recipient2);
-	holes.add(obstacle1);
-	auto bound_box = DrawParticles::DrawSkin(vd,sz,domain,holes,recipient1);
+    Box<3, double> obstacle1({0.9       , 0.24 - dp / 2.0   , 0.0   }, {1.02 + dp / 2.0, 0.36,         0.45 - dp / 2.0 });
+    Box<3, double> obstacle2({0.9 + dp  , 0.24 + dp / 2.0   , 0.0   }, {1.02 - dp / 2.0, 0.36 - dp,    0.45 + dp / 2.0 });
+    Box<3, double> obstacle3({0.9 + dp  , 0.24              , 0.0   }, {1.02           , 0.36,         0.45            });
+    
+    /*
+    Box<3,double> recipient1({0.0,0.0,0.0},{1.6+dp/2.0,0.67+dp/2.0,0.4+dp/2.0})         ;
+    Box<3,double> recipient2({dp,dp,dp},{1.6-dp/2.0,0.67-dp/2.0,0.4+dp/2.0})            ;
+    Box<3,double> obstacle1({0.9,0.24-dp/2.0,0.0},{1.02+dp/2.0,0.36,0.45+dp/2.0})       ;
+    Box<3,double> obstacle2({0.9+dp,0.24+dp/2.0,0.0},{1.02-dp/2.0,0.36-dp,0.45-dp/2.0}) ;
+    Box<3,double> obstacle3({0.9+dp,0.24,0.0},{1.02,0.36,0.45});
+    */
 
-	while (bound_box.isNext())
-	{
-		vd.add();
+    openfpm::vector<Box<3, double>> holes;
+    LOGFunction("creating holes");
+    holes.add(recipient2);
+    //LOGFunction("add recipients ");
+    holes.add(obstacle1);
+    LOGFunction("add obstacles ");
+    auto bound_box = DrawParticles::DrawSkin(vd, sz, domain, holes, recipient1);
+    LOGFunction("DrawSkin ");
+    while (bound_box.isNext())
+    {
+        vd.add();
 
-		vd.getLastPos()[0] = bound_box.get().get(0);
-		vd.getLastPos()[1] = bound_box.get().get(1);
-		vd.getLastPos()[2] = bound_box.get().get(2);
+        vd.getLastPos()[0] = bound_box.get().get(0);
+        vd.getLastPos()[1] = bound_box.get().get(1);
+        vd.getLastPos()[2] = bound_box.get().get(2);
 
-		vd.template getLastProp<type>() = BOUNDARY;
-		vd.template getLastProp<rho>() = rho_zero;
-		vd.template getLastProp<rho_prev>() = rho_zero;
-		vd.template getLastProp<velocity>()[0] = 0.0;
-		vd.template getLastProp<velocity>()[1] = 0.0;
-		vd.template getLastProp<velocity>()[2] = 0.0;
+        vd.template getLastProp<type>() = BOUNDARY;
+        vd.template getLastProp<rho>() = rho_zero;
+        vd.template getLastProp<rho_prev>() = rho_zero;
+        vd.template getLastProp<velocity>()[0] = 0.0;
+        vd.template getLastProp<velocity>()[1] = 0.0;
+        vd.template getLastProp<velocity>()[2] = 0.0;
 
-		vd.template getLastProp<velocity_prev>()[0] = 0.0;
-		vd.template getLastProp<velocity_prev>()[1] = 0.0;
-		vd.template getLastProp<velocity_prev>()[2] = 0.0;
+        vd.template getLastProp<velocity_prev>()[0] = 0.0;
+        vd.template getLastProp<velocity_prev>()[1] = 0.0;
+        vd.template getLastProp<velocity_prev>()[2] = 0.0;
 
-		++bound_box;
-	}
-	auto obstacle_box = DrawParticles::DrawSkin(vd,sz,domain,obstacle2,obstacle1);
+        ++bound_box;
+    }
+    //auto obstacle_box = DrawParticles::DrawSkin(vd, sz, domain, obstacle2, obstacle1);
 
-	while (obstacle_box.isNext())
-	{
-		vd.add();
+    //openfpm::vector<Box<3, double>> obstacle_box;
+    //obstacle_box.add(obstacle1);
 
-		vd.getLastPos()[0] = obstacle_box.get().get(0);
-		vd.getLastPos()[1] = obstacle_box.get().get(1);
-		vd.getLastPos()[2] = obstacle_box.get().get(2);
+    auto obstacle_box = DrawParticles::DrawBox(vd,sz,domain,obstacle1);
 
-		vd.template getLastProp<type>() = BOUNDARY;
-		vd.template getLastProp<rho>() = rho_zero;
-		vd.template getLastProp<rho_prev>() = rho_zero;
-		vd.template getLastProp<velocity>()[0] = 0.0;
-		vd.template getLastProp<velocity>()[1] = 0.0;
-		vd.template getLastProp<velocity>()[2] = 0.0;
+    while (obstacle_box.isNext())
+    {
+        vd.add();
 
-		vd.template getLastProp<velocity_prev>()[0] = 0.0;
-		vd.template getLastProp<velocity_prev>()[1] = 0.0;
-		vd.template getLastProp<velocity_prev>()[2] = 0.0;
+        vd.getLastPos()[0] = obstacle_box.get().get(0);
+        vd.getLastPos()[1] = obstacle_box.get().get(1);
+        vd.getLastPos()[2] = obstacle_box.get().get(2);
 
-		++obstacle_box;
-	}
+        vd.template getLastProp<type>() = BOUNDARY;
+        vd.template getLastProp<rho>() = rho_zero;
+        vd.template getLastProp<rho_prev>() = rho_zero;
+        vd.template getLastProp<velocity>()[0] = 0.0;
+        vd.template getLastProp<velocity>()[1] = 0.0;
+        vd.template getLastProp<velocity>()[2] = 0.0;
 
-	vd.map();
-	// Now that we fill the vector with particles
-	ModelCustom md;
+        vd.template getLastProp<velocity_prev>()[0] = 0.0;
+        vd.template getLastProp<velocity_prev>()[1] = 0.0;
+        vd.template getLastProp<velocity_prev>()[2] = 0.0;
 
-	vd.addComputationCosts(md);
-	vd.getDecomposition().decompose();
-	vd.map();
+        ++obstacle_box;
+    }
 
-	//! \cond [load balancing] \endcond
+    vd.map();
+    // Now that we fill the vector with particles
+    ModelCustom md;
 
-	vd.ghost_get<type,rho,Pressure,velocity>();
+    vd.addComputationCosts(md);
+    vd.getDecomposition().decompose();
+    vd.map();
 
-	auto NN = vd.getCellList(2*H);
+    //! \cond [load balancing] \endcond
 
-	size_t write = 0;
-	size_t it = 0;
-	size_t it_reb = 0;
-	double t = 0.0;
-	
-	double dt =	DtMin;
+    vd.ghost_get<type, rho, Pressure, velocity>();
 
-	while (t <= t_end)
-	{
-		start = std::chrono::high_resolution_clock::now();
+    auto NN = vd.getCellList(2 * H);
 
-		Vcluster<> & v_cl = create_vcluster();
-		timer it_time;
+    size_t write = 0;
+    size_t it = 0;
+    size_t it_reb = 0;
+    size_t timestep = 0;
+    double t = 0.0;
 
-		////// Do rebalancing every 200 timesteps
-		it_reb++;
-		if (it_reb == 200)
-		{
-			vd.map();
+    double dt = DtMin;
 
-			it_reb = 0;
-			ModelCustom md;
-			vd.addComputationCosts(md);
-			vd.getDecomposition().decompose();
+    while (t <= t_end)
+    {
+        // start = std::chrono::high_resolution_clock::now();
 
-			if (v_cl.getProcessUnitID() == 0)
-				std::cout << "REBALANCED " << std::endl;
-		}
+        Vcluster<> &v_cl = create_vcluster();
+        timer it_time;
+        it_reb++;
+        if (it_reb == 200)
+        {
+            vd.map();
 
-		vd.map();
+            it_reb = 0;
+            ModelCustom md;
+            vd.addComputationCosts(md);
+            vd.getDecomposition().decompose();
 
-		double max_visc = 0.0;
+            if (v_cl.getProcessUnitID() == 0)
+                std::cout << "REBALANCED " << std::endl;
+        }
+        vd.map();
+        double max_visc = 0.0;
+        vd.ghost_get<type, rho, Pressure, velocity>();
 
-		vd.ghost_get<type,rho,Pressure,velocity>();
+        // Calc all forces but pressure
+        calc_forces_withoutPressure(vd, NN, max_visc);
+        LOGExit("Calc_forces", v_cl.getProcessUnitID());
+        /*
+        old main
+        calc_forces(vd,NN,max_visc) ;
+        EqState(vd)             ;
+        */
+        // Get the maximum viscosity term across processors
 
-		// Calc all forces but pressure
-		calc_forces_withoutPressure(vd,NN,max_visc);
 
-		// 	Calculate pressure with ICApproach
-		EqState_incompressible(vd,NN,dt);
+        double error_min = 0.01;
+        int min_itteration = 3;
+        int iter = 0;
+        double rel_rho_predicted_error_max ;
 
-		// Get the maximum viscosity term across processors
-		v_cl.max(max_visc);
-		v_cl.execute();
+        // whiler max_error > something do
+        while ((rel_rho_predicted_error_max > error_min) || (iter < min_itteration))
+        {
+            rel_rho_predicted_error_max = 0;
+            LOGEnter("EqState", v_cl.getProcessUnitID());
+        
+            EqState_incompressible(vd, NN, dt, max_visc ,rel_rho_predicted_error_max);
 
-		// Calculate delta t integration
-		double dt = calc_deltaT(vd,max_visc);
+            LOGExit("EqState", v_cl.getProcessUnitID());
+            LOGEnter("entering  pressure force", v_cl.getProcessUnitID());
+            calc_forces_Pressure(vd,NN,max_visc) ;
+            LOGExit("leaving  pressure force", v_cl.getProcessUnitID());
 
-		// VerletStep or euler step
-		it++;
-		if (it < 40)
-			verlet_int(vd,dt);
-		else
-		{
-			euler_int(vd,dt);
-			it = 0;
-		}
+            LOGDouble("predicted error = ", rel_rho_predicted_error_max);
+            LOGDouble("pressure iteration  = ", iter)   ;
+            LOGFunction("Leaving Pressure iteration")  ;
+            ++iter;
+            if (iter>25){break;}
+        }
+        //update converged velocity and pressure
+        v_cl.max(max_visc);
+        v_cl.execute();
 
-		t += dt;
-		if (write < t*500)
+        // Calculate delta t integration
+        double dt = calc_deltaT(vd, max_visc);
+        // VerletStep or euler step
+        it++;
+
+        if (it < 40)
+            verlet_int(vd, dt);
+        //  verlet_int_no_densityUpdate(vd,dt);
+        else
+        {
+            euler_int(vd, dt);
+            // euler_intno_densityUpdate(vd,dt);
+            it = 0;
+        }
+
+
+        timestep +=1;
+        t += dt;
+        // if (write < t*100)
+        if (true)
         {
             // sensor_pressure calculation require ghost and update cell-list
             vd.map();
-            vd.ghost_get<type,rho,Pressure,velocity>();
+            vd.ghost_get<type, rho, Pressure, velocity>();
             vd.updateCellList(NN);
             // calculate the pressure at the sensor points
-            sensor_pressure(vd,NN,press_t,probes);
-            vd.write_frame("output/Geometry",write);
+            // sensor_pressure(vd,NN,press_t,probes);
+            vd.write_frame("output/Geometry", write);
             write++;
             if (v_cl.getProcessUnitID() == 0)
-            {std::cout << "TIME: " << t << "  write " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;}
+            {
+                std::cout << "TIME: " << t << "  write " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
+            }
         }
         else
         {
             if (v_cl.getProcessUnitID() == 0)
-            {std::cout << "TIME: " << t << "  " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "    Max visc: " << max_visc << std::endl;}
+            {
+                std::cout << "TIME: " << t << "  " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "    Max visc: " << max_visc << std::endl;
+            }
         }
-		stop = std::chrono::high_resolution_clock::now()		;
-		float microseconds = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-		time_per_timestep.push_back(microseconds)	;
-		std::cout<< "microseconds per loop" << '\n'			;
-		std::cout<< microseconds << '\n'			;
-	}
-	openfpm_finalize();
+        //if (timestep > 2){break;};
+    }
+
+    openfpm_finalize();
 }
- 

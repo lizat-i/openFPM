@@ -2,3 +2,6 @@ build_run_dir
 config*
 *.o
 sph_dlb
+log
+output
+
