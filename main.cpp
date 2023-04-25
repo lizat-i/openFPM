@@ -3,11 +3,15 @@
 #include "Vector/vector_dist.hpp"
 #include <math.h>
 #include "Draw/DrawParticles.hpp"
+#include <limits>
 // A constant to indicate boundary particles
 #define BOUNDARY 0
 // A constant to indicate fluid particles
 #define FLUID 1
 // initial spacing between particles dp in the formulas
+double eps = std::numeric_limits<double>::epsilon();
+
+
 const double dp = 0.0085;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
@@ -259,15 +263,15 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                     kernel += wab;
                     rho_wab += rhob * wab;
                     p_wab += pressure_b * wab;
-                    g_wab += (dr.get(0) * wab * rhob * 0 + dr.get(1) * wab * rhob * 0 + dr.get(2) * wab * rhob * (-9.81));
+                    g_wab += (wab * rhob * (-9.81));
                 }
 
                 ++Np;
             }
             // Pressure and density calclation Boundary Particle
-             
-            vd.getProp<rho>(a) = (kernel > 0) ? rho_wab / kernel : rhoa; ;
-            vd.getProp<Pressure>(a) = (kernel > 0) ? (p_wab + g_wab) / kernel : Pa ;
+
+            vd.getProp<rho>(a) = (kernel > eps) ? rho_wab / kernel : rhoa;
+            vd.getProp<Pressure>(a) = (kernel > eps) ? (p_wab + g_wab)/ kernel : Pa;
         }
         else
         {
@@ -606,12 +610,12 @@ int main(int argc, char *argv[])
         ++fluid_it;
     }
     // Recipient
-    Box<3, double> recipient1({0.0 -3*dp, 0.0 -3*dp, 0.0 -3.0*dp}, {1.6 + dp *3.0   , 0.67 + dp * 3.0, 0.4-dp/2  });
-    //Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
-    Box<3, double> recipient2({dp, dp, dp}, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
-    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0 -3.0*dp}, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2.0});
-    Box<3, double> obstacle2({0.9 + dp, 0.24 + dp / 2.0, 0.0-3.0*dp}, {1.02 - dp / 2.0, 0.36 - dp, 0.45 - dp / 2.0});
-    Box<3, double> obstacle3({0.9 + dp, 0.24, 0.0-3.0*dp}, {1.02, 0.36, 0.45});
+    Box<3, double> recipient1({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0 - 3.0 * dp}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4 - dp / 2});
+    // Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
+    Box<3, double> recipient2({dp, dp, dp                   }, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
+    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0     }, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2.0});
+    Box<3, double> obstacle2({0.9 + dp, 0.24 + dp / 2.0, 0.0}, {1.02 - dp / 2.0, 0.36 - dp, 0.45 - dp / 2.0});
+    Box<3, double> obstacle3({0.9 + dp, 0.24, 0.0           }, {1.02, 0.36, 0.45});
     openfpm::vector<Box<3, double>> holes;
     holes.add(recipient2);
     holes.add(obstacle1);
@@ -633,7 +637,8 @@ int main(int argc, char *argv[])
         vd.template getLastProp<velocity_prev>()[2] = 0.0;
         ++bound_box;
     }
-    auto obstacle_box = DrawParticles::DrawSkin(vd, sz, domain, obstacle2, obstacle1);
+    //auto obstacle_box = DrawParticles::DrawSkin(vd, sz, domain, obstacle2, obstacle1);
+    auto obstacle_box = DrawParticles::DrawBox(vd, sz, domain,obstacle1);
     while (obstacle_box.isNext())
     {
         vd.add();
@@ -672,13 +677,11 @@ int main(int argc, char *argv[])
         if (it_reb == 200)
         {
             vd.map();
-            it_reb = 0;
             ModelCustom md;
             vd.addComputationCosts(md);
             vd.getDecomposition().decompose();
             if (v_cl.getProcessUnitID() == 0)
                 std::cout << "REBALANCED " << std::endl;
-            
         }
         vd.map();
         // Calculate pressure from the density
@@ -712,6 +715,8 @@ int main(int argc, char *argv[])
             sensor_pressure(vd, NN, press_t, probes);
             vd.write_frame("output/Geometry", write);
             it_reb = 0;
+            ++write;
+            
             if (v_cl.getProcessUnitID() == 0)
             {
                 std::cout << "TIME: " << t << "  write " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
