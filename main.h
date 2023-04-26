@@ -203,84 +203,66 @@ inline double Pi(const Point<3, double> &dr, double rr2, Point<3, double> &dv, d
         return 0.0;
 }
 template <typename CellList>
-inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
-{
+inline void calc_nonPforces(particles &vd, CellList &NN, double &max_visc)
+{   /*  
+
+        Initializes Forces and adds Tensile correction and viscous forces
+        Tensile correction and Viscous interaction Term
+        according to openFPM.. havent changed yet, but might be
+        necessarry in the future to calculate it.
+
+    */
     auto part = vd.getDomainIterator();
-
-    // Update the cell-list
     vd.updateCellList(NN);
-
-    // For each particle ...
     while (part.isNext())
     {
-        // ... a
         auto a = part.get();
-
-        // Get the position xp of the particle
-        Point<3, double> xa = vd.getPos(a);
-
-        // Take the mass of the particle dependently if it is FLUID or BOUNDARY
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
-
-        // Get the density of the of the particle a
         double rhoa = vd.getProp<rho>(a);
-
-        // Get the pressure of the particle a
         double Pa = vd.getProp<Pressure>(a);
-
-        // Get the Velocity of the particle a
+        
+        Point<3, double> xa = vd.getPos(a);
         Point<3, double> va = vd.getProp<velocity>(a);
 
-        // Reset the force counter (- gravity on zeta direction)
         vd.template getProp<force>(a)[0] = 0.0;
         vd.template getProp<force>(a)[1] = 0.0;
         vd.template getProp<force>(a)[2] = -gravity;
+        //  #TODO Initilize Pressure Force here with zero
+        //  Maybe later with actual value?
+        vd.template getProp<force_pressure>(a)[0] = 0.0;
+        vd.template getProp<force_pressure>(a)[1] = 0.0;
+        vd.template getProp<force_pressure>(a)[2] = 0.0;
+
+        //vd.template getProp<Pressure>(a)[0] = 0.0;
+        //vd.template getProp<Pressure>(a)[1] = 0.0;
+        //vd.template getProp<Pressure>(a)[2] = 0.0;
+
         vd.template getProp<drho>(a) = 0.0;
 
-        // We threat FLUID particle differently from BOUNDARY PARTICLES ...
         if (vd.getProp<type>(a) == FLUID)
         {
-            // If it is a fluid particle calculate based on equation 1 and 2
-
-            // Get an iterator over the neighborhood particles of p
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
 
-            // For each neighborhood particle
             while (Np.isNext() == true)
-            {
-                // ... q
+            {   
+
                 auto b = Np.get();
+                if (a.getKey() == b){ ++Np; continue; };
 
-                // Get the position xp of the particle
-                Point<3, double> xb = vd.getPos(b);
-
-                // if (p == q) skip this particle
-                if (a.getKey() == b)
-                {
-                    ++Np;
-                    continue;
-                };
-
-                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
-                Point<3, double> vb = vd.getProp<velocity>(b);
-                double Pb = vd.getProp<Pressure>(b);
+                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound; 
                 double rhob = vd.getProp<rho>(b);
+                double Pb = vd.getProp<Pressure>(b);
 
-                // Get the distance between p and q
+                Point<3, double> xb = vd.getPos(b);
+                Point<3, double> vb = vd.getProp<velocity>(b);
                 Point<3, double> dr = xa - xb;
-                // take the norm of this vector
                 double r2 = norm2(dr);
-
-                // if they interact
                 if (r2 < 4.0 * H * H)
                 {
                     double r = sqrt(r2);
-
                     Point<3, double> v_rel = va - vb;
-
                     Point<3, double> DW;
                     DWab(dr, DW, r, false);
-                    
                     double factor = -massb * (Tensile(r, rhoa, rhob, Pa, Pb)+ Pi(dr, r2, v_rel, rhoa, rhob, massb, max_visc));
 
                     vd.getProp<force>(a)[0] += factor * DW.get(0);
@@ -305,25 +287,15 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
     // For each particle ...
     while (part.isNext())
     {
-        // ... a
         auto a = part.get();
 
-        // Get the position xp of the particle
         Point<3, double> xa = vd.getPos(a);
-
-        // Take the mass of the particle dependently if it is FLUID or BOUNDARY
-        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
-
-        // Get the density of the of the particle a
-        double rhoa = vd.getProp<rho>(a);
-
-        // Get the pressure of the particle a
-        double Pa = vd.getProp<Pressure>(a);
-
-        // Get the Velocity of the particle a
         Point<3, double> va = vd.getProp<velocity>(a);
 
-        // We threat FLUID particle differently from BOUNDARY PARTICLES ...
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
+        double rhoa = vd.getProp<rho>(a);
+        double Pa = vd.getProp<Pressure>(a);
+
         if (vd.getProp<type>(a) != FLUID)
         {
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
@@ -331,33 +303,25 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
             double rho_wab = 0;
             double p_wab = 0;
             double g_wab = 0;
+
             // For each neighborhood particle
             while (Np.isNext() == true)
-            {
-                // ... q
-                auto b = Np.get();
+            {                   
+                auto   b = Np.get(); 
+                if (a.getKey() == b || vd.getProp<type>(b) != FLUID){++Np;continue;};
 
-                // Get the position xp of the particle
-                Point<3, double> xb = vd.getPos(b);
+                Point<3, double> xb = vd.getPos(b)      ;
+                Point<3, double> dr = xa - xb           ;         
+
+     
                 double pressure_b = vd.getProp<Pressure>(b);
-                // if (p == q) skip this particle
-                if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
-                {
-                    ++Np;
-                    continue;
-                };
-
-                // get the mass of the particle
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
                 double rhob = vd.getProp<rho>(b);
-                Point<3, double> dr = xa - xb;
-                // take the norm of this vector
                 double r2 = norm2(dr);
 
                 // If the particles interact ...
                 if (r2 < 4.0 * H * H)
                 {
-
                     double wab = Wab(sqrt(r2));
                     kernel += wab;
                     rho_wab += rhob * wab;
@@ -386,39 +350,35 @@ inline void calc_forces_pressure(particles &vd, CellList &NN, double &max_visc)
     // For each particle ...
     while (part.isNext())
     {
-        // ... a
         auto a = part.get();
         Point<3, double> xa = vd.getPos(a);
+        Point<3, double> va = vd.getProp<velocity>(a);
+
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
         double Pa = vd.getProp<Pressure>(a);
-        Point<3, double> va = vd.getProp<velocity>(a);
 
-        // We threat FLUID particle differently from BOUNDARY PARTICLES ...
-        if (vd.getProp<type>(a) != FLUID)
-        {
-            ++part;
-            continue;
-        }
-        else
+        if (vd.getProp<type>(a) == FLUID)
         {
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
             while (Np.isNext() == true)
-            {
-                auto b = Np.get();
-                Point<3, double> xb = vd.getPos(b);
-                if (a.getKey() == b)
-                {
-                    ++Np;
-                    continue;
-                };
+            {   
+                auto b = Np.get();  
 
-                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+                if (a.getKey() == b){ ++Np; continue; };
+
+                   
+
+                Point<3, double> xb = vd.getPos(b);
+                Point<3, double> dr = xa - xb;                
                 Point<3, double> vb = vd.getProp<velocity>(b);
-                double Pb = vd.getProp<Pressure>(b);
-                double rhob = vd.getProp<rho>(b);
-                Point<3, double> dr = xa - xb;
-                double r2 = norm2(dr);
+
+
+                double massb    = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+                double Pb       = vd.getProp<Pressure>(b);
+                double rhob     = vd.getProp<rho>(b);
+                double r2       = norm2(dr);
+
                 if (r2 < 4.0 * H * H)
                 {
                     double r = sqrt(r2);
@@ -525,6 +485,7 @@ void verlet_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt2;
 
         vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
+
         // Check if the particle go out of range in space and in density
         if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
             vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
@@ -604,6 +565,65 @@ void euler_int(particles &vd, double dt)
     // increment the iteration counter
     cnt++;
 }
+
+void cheng_int(particles &vd, double dt)
+{
+    // list of the particle to remove
+    to_remove.clear();
+    // particle iterator
+    auto part = vd.getDomainIterator();
+
+    // For each particle ...
+    while (part.isNext())
+    {
+        auto a = part.get();
+ 
+        if (vd.template getProp<type>(a) == BOUNDARY)
+        {
+            // Update rho
+            double rhop = vd.template getProp<rho>(a);
+            // Update only the density
+            vd.template getProp<velocity>(a)[0] = 0.0;
+            vd.template getProp<velocity>(a)[1] = 0.0;
+            vd.template getProp<velocity>(a)[2] = 0.0;
+            // double rhonew = vd.template getProp<rho>(a) + dt*vd.template getProp<drho>(a);
+            // vd.template getProp<rho>(a) = (rhonew < rho_zero)?rho_zero:rhonew;
+            vd.template getProp<rho_prev>(a) = rhop;
+            ++part;
+            continue;
+        }
+        double massa    = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
+
+        vd.template getProp<velocity_prev>(a)[0] = vd.template getProp<velocity>(a)[0];
+        vd.template getProp<velocity_prev>(a)[1] = vd.template getProp<velocity>(a)[1];
+        vd.template getProp<velocity_prev>(a)[2] = vd.template getProp<velocity>(a)[2];
+
+        vd.template getProp<velocity>(a)[0] += (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0])/massa * dt;
+        vd.template getProp<velocity>(a)[1] += (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1])/massa * dt;
+        vd.template getProp<velocity>(a)[2] += (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2])/massa * dt;
+
+        vd.getPos(a)[0] += (vd.template getProp<velocity>(a)[0] + vd.template getProp<velocity>(a)[0] )* dt ;
+        vd.getPos(a)[1] += (vd.template getProp<velocity>(a)[1] + vd.template getProp<velocity>(a)[1] )* dt ;
+        vd.getPos(a)[2] += (vd.template getProp<velocity>(a)[2] + vd.template getProp<velocity>(a)[2] )* dt ;
+
+        vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
+        vd.template getProp<rho>(a) = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
+
+        // Check if the particle go out of range in space and in density
+        if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
+            vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
+            vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
+        {
+            to_remove.add(a.getKey());
+        }
+        ++part;
+    }
+    // remove the particles
+    vd.remove(to_remove, 0);
+    // increment the iteration counter
+    cnt++;
+}
+
 template <typename Vector, typename CellList>
 inline void sensor_pressure(Vector &vd,
                             CellList &NN,
@@ -668,25 +688,17 @@ inline void predictPositionAndVelocity(particles &vd, CellList &NN, double &dt, 
     auto it = vd.getDomainIterator();
     while (it.isNext())
     {
-        double pressureKoefficient;
         double dt205 = dt * dt * 0.5;
         double dt2 = dt * 2.0;
-        double rho_predicted_error;
-        double delta_pressure;
-        Point<3, double> beta_1;
-        double beta_2;
-        double beta;
-        /* Velocity and Position block */
+        double dt05 = dt * 0.5;
         auto a = it.get();
-        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
-        double rhoa = vd.getProp<rho>(a);
-        double Pa = vd.getProp<Pressure>(a);
-
         if (vd.getProp<type>(a) == FLUID)
         {
         Point<3, double> xa;
         Point<3, double> va;
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         // 	Predict velocity
+        /*
         vd.template getProp<vel_predicted>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt;
         vd.template getProp<vel_predicted>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt;
         vd.template getProp<vel_predicted>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
@@ -695,6 +707,16 @@ inline void predictPositionAndVelocity(particles &vd, CellList &NN, double &dt, 
         vd.template getProp<pos_predicted>(a)[0] = vd.getPos(a)[0] + vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt205;
         vd.template getProp<pos_predicted>(a)[1] = vd.getPos(a)[1] + vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt205;
         vd.template getProp<pos_predicted>(a)[2] = vd.getPos(a)[2] + vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt205;
+        */
+ 
+        vd.template getProp<vel_predicted>(a)[0] = vd.template getProp<velocity>(a)[0] + ((vd.template getProp<force>(a)[0]  + vd.template getProp<force_pressure>(a)[0])/massa) * dt;
+        vd.template getProp<vel_predicted>(a)[1] = vd.template getProp<velocity>(a)[1] + ((vd.template getProp<force>(a)[1]  + vd.template getProp<force_pressure>(a)[1])/massa) * dt;
+        vd.template getProp<vel_predicted>(a)[2] = vd.template getProp<velocity>(a)[2] + ((vd.template getProp<force>(a)[2]  + vd.template getProp<force_pressure>(a)[2])/massa) * dt;
+
+        //  Predict spatial Coordinates
+        vd.template getProp<pos_predicted>(a)[0] = vd.getPos(a)[0] + (vd.template getProp<velocity>(a)[0] + vd.template getProp<vel_predicted>(a)[0]) * dt05 ;
+        vd.template getProp<pos_predicted>(a)[1] = vd.getPos(a)[1] + (vd.template getProp<velocity>(a)[1] + vd.template getProp<vel_predicted>(a)[1]) * dt05 ;
+        vd.template getProp<pos_predicted>(a)[2] = vd.getPos(a)[2] + (vd.template getProp<velocity>(a)[2] + vd.template getProp<vel_predicted>(a)[2]) * dt05 ;
         }
         ++it;
     };
@@ -702,7 +724,6 @@ inline void predictPositionAndVelocity(particles &vd, CellList &NN, double &dt, 
 template <typename CellList>
 inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, double &max_visc, double &rel_rho_predicted_error_max)
 {
-    double dt205 = dt * dt * 0.5;
     double dt2 = dt * 2.0;
 
     auto it = vd.getDomainIterator();
@@ -714,7 +735,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
         Point<3, double> beta_1;
         double beta_2;
         double beta;
-        /* Velocity and Position block */
+ 
         auto a = it.get();
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
@@ -730,18 +751,17 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
             {
                 auto b = Np.get();
 
-                if (a.getKey() == b)
-                {
-                    ++Np;
-                    continue;
-                };
-                Point<3, double> xb = vd.getProp<pos_predicted>(b);;
-                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+                if (a.getKey() == b){ ++Np; continue; };
+
+                Point<3, double> xb = vd.getProp<pos_predicted>(b);
                 Point<3, double> vb = vd.getProp<vel_predicted>(b);
+                Point<3, double> dr = xa - xb;
+
                 double Pb = vd.getProp<Pressure>(b);
                 double rhob = vd.getProp<rho>(b);
-                Point<3, double> dr = xa - xb;
+                double massb =  MassFluid       ;
                 double r2 = norm2(dr);
+
                 if (r2 < 4.0 * H * H)
                 {
                     double r = sqrt(r2);

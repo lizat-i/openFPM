@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
         double max_visc = 0.0;
         vd.ghost_get<type, rho, Pressure, velocity>();
         // Calc forces
-        calc_forces(vd, NN, max_visc);
+        calc_nonPforces(vd, NN, max_visc);
         v_cl.max(max_visc);
         v_cl.execute();
         // Calculate delta t integration
@@ -161,14 +161,16 @@ int main(int argc, char *argv[])
         while ((rel_rho_predicted_error_max > error_min) || (pressureIteration < min_itteration))
         {
             rel_rho_predicted_error_max = 0;
-            LOGEnter("EqState", v_cl.getProcessUnitID());
+ 
             predictPositionAndVelocity(vd, NN, dt, max_visc, rel_rho_predicted_error_max);
             EqState_incompressible(vd, NN, dt, max_visc, rel_rho_predicted_error_max);
 
             LOGExit("EqState", v_cl.getProcessUnitID());
             LOGEnter("entering  pressure force", v_cl.getProcessUnitID());
+
             extrapolate_Boundaries(vd, NN, max_visc);
             calc_forces_pressure(vd, NN, max_visc);
+
             LOGExit("leaving  pressure force", v_cl.getProcessUnitID());
             if (v_cl.getProcessUnitID() == 0)
             {
@@ -184,8 +186,10 @@ int main(int argc, char *argv[])
             //     break;
             // }
         }
-
+        /* CHENG integration*/
         // VerletStep or euler step
+
+        /*
         it++;
         if (it < 40)
             verlet_int(vd, dt);
@@ -194,6 +198,10 @@ int main(int argc, char *argv[])
             euler_int(vd, dt);
             it = 0;
         }
+        */
+
+       cheng_int(vd, dt);
+
         t += dt;
         if (it_reb == 50)
         {
