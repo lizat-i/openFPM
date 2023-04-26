@@ -280,8 +280,8 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
 
                     Point<3, double> DW;
                     DWab(dr, DW, r, false);
-
-                    double factor = -massb * (Tensile(r, rhoa, rhob, Pa, Pb) + Pi(dr, r2, v_rel, rhoa, rhob, massb, max_visc));
+                    
+                    double factor = -massb * (Tensile(r, rhoa, rhob, Pa, Pb)+ Pi(dr, r2, v_rel, rhoa, rhob, massb, max_visc));
 
                     vd.getProp<force>(a)[0] += factor * DW.get(0);
                     vd.getProp<force>(a)[1] += factor * DW.get(1);
@@ -702,12 +702,13 @@ inline void predictPositionAndVelocity(particles &vd, CellList &NN, double &dt, 
 template <typename CellList>
 inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, double &max_visc, double &rel_rho_predicted_error_max)
 {
+    double dt205 = dt * dt * 0.5;
+    double dt2 = dt * 2.0;
+
     auto it = vd.getDomainIterator();
     while (it.isNext())
     {
         double pressureKoefficient;
-        double dt205 = dt * dt * 0.5;
-        double dt2 = dt * 2.0;
         double rho_predicted_error;
         double delta_pressure;
         Point<3, double> beta_1;
@@ -719,8 +720,8 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
         double rhoa = vd.getProp<rho>(a);
         double Pa = vd.getProp<Pressure>(a);
 
-        Point<3, double> xa = getProp<vel_predicted>(a) ;
-        Point<3, double> va = getProp<pos_predicted>(a) ;
+        Point<3, double> xa = vd.getProp<pos_predicted>(a) ;
+        Point<3, double> va = vd.getProp<vel_predicted>(a) ;
 
         if (vd.getProp<type>(a) == FLUID)
         {
@@ -741,7 +742,6 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
                 double rhob = vd.getProp<rho>(b);
                 Point<3, double> dr = xa - xb;
                 double r2 = norm2(dr);
-                Point<3, double> DW_sum;
                 if (r2 < 4.0 * H * H)
                 {
                     double r = sqrt(r2);
@@ -756,10 +756,9 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
             }
 
             beta = (beta_1.get(0) * beta_1.get(0) + beta_1.get(1) * beta_1.get(1) + beta_1.get(2) * beta_1.get(2)) + beta_2;
-            double rho_predicted = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+            double rho_predicted = rhoa + vd.getProp<drho>(a) * dt;
 
             // LOGFunction(rho_predicted);
-
             rho_predicted_error = rho_predicted - rho_zero;
 
             // Keep track of max error
