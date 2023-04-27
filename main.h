@@ -719,7 +719,6 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
  
         Point<3, double> dW_term1;
         double dW_term2;
-        double pressureKoefficient;
  
         auto a = it.get();
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
@@ -760,16 +759,15 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
                     DWab(dr, DW, r, false);
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                     
-                    dW_term1 +=  DW;
-                    dW_term2 += (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    dW_term1 +=  massb *DW;
+                    dW_term2 += massa*massb* (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             }
-            double beta =  (dt * dt * massa*massa*2)/(rho_zero * rho_zero);
-
+            
             double dW_term1_square = (dW_term1.get(0) * dW_term1.get(0) + dW_term1.get(1) * dW_term1.get(1) + dW_term1.get(2) * dW_term1.get(2));
-
-            pressureKoefficient = -1/(beta *  (-dW_term1_square - dW_term2) );
+            double beta = dW_term1_square + dW_term2;
+            double pressureKoefficient = (rho_zero * rho_zero)/(dt * dt *beta) ;
             double rho_predicted = rhoa + vd.getProp<drho>(a) * dt;
 
             // LOGFunction(rho_predicted);
@@ -780,8 +778,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
             rel_rho_predicted_error_max = std::max(rel_rho_predicted_error_max, std::abs(rho_predicted_error / rho_zero));
 
             // Update Pressure using predicted density error and pressure coeeficient
-            // TODO update pressure pressure Koefficient
-            
+            // TODO update pressure pressure Koefficient        
             
             double delta_pressure = pressureKoefficient * rho_predicted_error;
             vd.getProp<Pressure>(a) += delta_pressure;
