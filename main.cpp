@@ -189,7 +189,6 @@ int main(int argc, char *argv[])
         /* CHENG integration*/
         // VerletStep or euler step
 
-        /*
         it++;
         if (it < 40)
             verlet_int(vd, dt);
@@ -198,9 +197,9 @@ int main(int argc, char *argv[])
             euler_int(vd, dt);
             it = 0;
         }
-        */
+        
 
-       cheng_int(vd, dt);
+       //cheng_int(vd, dt);
 
         t += dt;
         if (it_reb == 50)
