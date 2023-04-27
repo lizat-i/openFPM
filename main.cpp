@@ -152,13 +152,13 @@ int main(int argc, char *argv[])
         // Calculate delta t integration
         double dt = calc_deltaT(vd, max_visc);
         // Get the maximum viscosity term across processors
-        double error_min = 0.01;
+        double error_max = 0.01;
         int min_itteration = 3;
         int pressureIteration = 0;
         double rel_rho_predicted_error_max;
 
         // whiler max_error > something do
-        while ((rel_rho_predicted_error_max > error_min) || (pressureIteration < min_itteration))
+        while ((rel_rho_predicted_error_max > error_max) || (pressureIteration < min_itteration))
         {
             rel_rho_predicted_error_max = 0;
  
@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
         }
         /* CHENG integration*/
         // VerletStep or euler step
-
+        /*
         it++;
         if (it < 40)
             verlet_int(vd, dt);
@@ -197,9 +197,9 @@ int main(int argc, char *argv[])
             euler_int(vd, dt);
             it = 0;
         }
-        
+       */ 
 
-       //cheng_int(vd, dt);
+       cheng_int(vd, dt);
 
         t += dt;
         if (it_reb == 50)
