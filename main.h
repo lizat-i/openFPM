@@ -280,7 +280,7 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
 
         if (vd.getProp<type>(a) != FLUID)
         {
-            Point<3, double> xa = vd.getPos(a);
+e
             double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
             double rhoa = vd.getProp<rho>(a);
             double Pa = vd.getProp<Pressure>(a);
