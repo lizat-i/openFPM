@@ -127,7 +127,8 @@ int main(int argc, char *argv[])
     size_t it_reb = 0;
     double t = 0.0;
     while (t <= t_end)
-    {
+    {   
+        std::cout << "Cluster stuf" << std::endl;
         Vcluster<> &v_cl = create_vcluster();
         timer it_time;
         it_reb++;
@@ -140,18 +141,26 @@ int main(int argc, char *argv[])
             if (v_cl.getProcessUnitID() == 0)
                 std::cout << "REBALANCED " << std::endl;
         }
+        std::cout << "Map" << std::endl;
         vd.map();
         // Calculate pressure from the density
-        //EqState(vd);
+        // EqState(vd);
+        
         double max_visc = 0.0;
+        std::cout << "Ghost get" << std::endl;
         vd.ghost_get<type, rho, Pressure, velocity>();
         // Calc forces
+        std::cout << "Calc non pressure forces" << std::endl;
         calc_nonPforces(vd, NN, max_visc);
+        std::cout << "maxing" << std::endl;
         v_cl.max(max_visc);
+        std::cout << "execute parallel shit" << std::endl;
         v_cl.execute();
         // Calculate delta t integration
+        std::cout << "dt" << std::endl;
         double dt = calc_deltaT(vd, max_visc);
         // Get the maximum viscosity term across processors
+         std::cout << "random definition" << std::endl;
         double error_max = 0.01;
         int min_itteration = 3;
         int pressureIteration = 0;
@@ -161,30 +170,22 @@ int main(int argc, char *argv[])
         while ((rel_rho_predicted_error_max > error_max) || (pressureIteration < min_itteration))
         {
             rel_rho_predicted_error_max = 0;
- 
+            std::cout << "predict x v" << std::endl;
             predictPositionAndVelocity(vd, NN, dt, max_visc, rel_rho_predicted_error_max);
+            std::cout << "pressure and density calc" << std::endl;
             EqState_incompressible(vd, NN, dt, max_visc, rel_rho_predicted_error_max);
-
-            LOGExit("EqState", v_cl.getProcessUnitID());
-            LOGEnter("entering  pressure force", v_cl.getProcessUnitID());
-
+            std::cout << "extrapolate boundaries" << std::endl;
             extrapolate_Boundaries(vd, NN, max_visc);
+            std::cout << "calc forces" << std::endl;
             calc_forces_pressure(vd, NN, max_visc);
 
-            LOGExit("leaving  pressure force", v_cl.getProcessUnitID());
             if (v_cl.getProcessUnitID() == 0)
             {
-            LOGDouble("predicted error = ", rel_rho_predicted_error_max);
-            LOGDouble("pressure pressureIterationation  = ", pressureIteration);
-            LOGFunction("Leaving Pressure pressureIterationation");
+                LOGDouble("error    = ", rel_rho_predicted_error_max);
+                LOGDouble("iter     = ", pressureIteration);
             }
 
             ++pressureIteration;
-
-            // if (pressureIteration > 25)
-            // {
-            //     break;
-            // }
         }
         /* CHENG integration*/
         // VerletStep or euler step
@@ -197,18 +198,22 @@ int main(int argc, char *argv[])
             euler_int(vd, dt);
             it = 0;
         }
-       */ 
+       */
 
-       cheng_int(vd, dt);
+        cheng_int(vd, dt);
 
         t += dt;
-        if (it_reb == 50)
+        if (it_reb == 1)
         {
+
             // sensor_pressure calculation require ghost and update cell-list
+
             vd.map();
             vd.ghost_get<type, rho, Pressure, velocity>();
             vd.updateCellList(NN);
+
             // calculate the pressure at the sensor points
+
             sensor_pressure(vd, NN, press_t, probes);
             vd.write_frame("output/Geometry", write);
             it_reb = 0;
