@@ -569,7 +569,7 @@ void euler_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
 
         vd.template getProp<rho>(a) = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
-        
+
         // Check if the particle go out of range in space and in density
         if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
             vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
@@ -624,9 +624,6 @@ void cheng_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[0] += (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt;
         vd.template getProp<velocity>(a)[1] += (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt;
         vd.template getProp<velocity>(a)[2] += (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
-
-        
-        
 
         vd.getPos(a)[0] = vd.template getProp<pos_prev>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt * 0.5;
         vd.getPos(a)[1] = vd.template getProp<pos_prev>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt * 0.5;
