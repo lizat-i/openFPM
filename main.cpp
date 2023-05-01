@@ -151,11 +151,11 @@ int main(int argc, char *argv[])
         if (it_reb == 200)
         {
             vd.map();
-            ModelCustom md;
-            vd.addComputationCosts(md);
-            vd.getDecomposition().decompose();
-            if (v_cl.getProcessUnitID() == 0)
-                std::cout << "REBALANCED " << std::endl;
+            //ModelCustom md;
+            //vd.addComputationCosts(md);
+            //vd.getDecomposition().decompose();
+            //if (v_cl.getProcessUnitID() == 0)
+            //    std::cout << "REBALANCED " << std::endl;
         }
         std::cout << "Map" << std::endl;
         vd.map();
