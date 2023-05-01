@@ -128,7 +128,9 @@ int main(int argc, char *argv[])
         double max_visc = 0.0;
         vd.ghost_get<type, rho, Pressure, velocity>();
         // Calc forces
-        calc_forces(vd, NN, max_visc);
+        calc_forces_and_drho(vd, NN, max_visc);
+        extrapolate_Boundaries(vd, NN, max_visc);
+
         // Get the maximum viscosity term across processors
         v_cl.max(max_visc);
         v_cl.execute();
