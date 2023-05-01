@@ -9,8 +9,7 @@
 
 int main(int argc, char *argv[])
 {
-    std::cout<<"started programm"<<'\n';
-
+    std::cout << "started programm" << '\n';
 
     openfpm_init(&argc, &argv);
     openfpm::vector<openfpm::vector<double>> press_t;
@@ -31,7 +30,6 @@ int main(int argc, char *argv[])
     B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
     cbar = coeff_sound * sqrt(gravity * h_swl);
 
-
     while (fluid_it.isNext())
     {
         vd.add();
@@ -50,18 +48,18 @@ int main(int argc, char *argv[])
         vd.template getLastProp<velocity_prev>()[2] = 0.0;
         ++fluid_it;
     }
-    
+
     // Build domain with 6 boxes.
     // first groundplate
-    Box<3, double> groundplate({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0 - 3.0 * dp}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.0});
+    Box<3, double> groundplate({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0 - 3.0 * dp}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.0 + dp / 2});
     // xmin xmax plates
-    Box<3, double> xmin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {0.0, 0.67 + dp * 3.0, 0.45});
-    Box<3, double> xmax({1.6, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.45});
+    Box<3, double> xmin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {0.0 + dp / 2, 0.67 + dp * 3.0, 0.45 + dp / 2});
+    Box<3, double> xmax({1.6 - dp / 2, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.45 + dp / 2});
     // ymin ymax plates
-    Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.00, 0.4});
-    Box<3, double> ymax({0.0 - 3 * dp, 0.67, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4});
+    Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0 + dp / 2, 0.00, 0.4 + dp / 2});
+    Box<3, double> ymax({0.0 - 3 * dp, 0.67 + dp / 2, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4 + dp / 2});
     // obstacle box
-    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45});
+    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2});
 
     openfpm::vector<Box<3, double>> obstacle_and_bound_box;
 
@@ -71,12 +69,12 @@ int main(int argc, char *argv[])
     obstacle_and_bound_box.add(ymin);
     obstacle_and_bound_box.add(ymax);
     obstacle_and_bound_box.add(obstacle1);
-    std::cout<<"draw box"<<'\n';
+    std::cout << "draw box" << '\n';
     for (size_t i = 0; i < 6; ++i)
     {
-        std::cout<<"for box number "<< i <<'\n';
+        std::cout << "for box number " << i << '\n';
         Box<3, double> box = obstacle_and_bound_box.get(i);
-        auto toFill = DrawParticles::DrawBox(vd, sz, domain,box);
+        auto toFill = DrawParticles::DrawBox(vd, sz, domain, box);
 
         while (toFill.isNext())
         {
@@ -146,20 +144,31 @@ int main(int argc, char *argv[])
             it = 0;
         }
         t += dt;
- 
-        // sensor_pressure calculation require ghost and update cell-list
-        vd.map();
-        vd.ghost_get<type, rho, Pressure, velocity>();
-        vd.updateCellList(NN);
-        // calculate the pressure at the sensor points
-        sensor_pressure(vd, NN, press_t, probes);
-        vd.write_frame("output/Geometry", write);
-        it_reb = 0;
-        //++write;
 
-        if (v_cl.getProcessUnitID() == 0)
+        if (write < t * 100)
         {
-            std::cout << "TIME: " << t << "  write " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
+
+            // sensor_pressure calculation require ghost and update cell-list
+            vd.map();
+            vd.ghost_get<type, rho, Pressure, velocity>();
+            vd.updateCellList(NN);
+            // calculate the pressure at the sensor points
+            sensor_pressure(vd, NN, press_t, probes);
+            vd.write_frame("output/Geometry", write);
+            it_reb = 0;
+            write++;
+
+            if (v_cl.getProcessUnitID() == 0)
+            {
+                std::cout << "TIME: " << t << "  write " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
+            }
+        }
+        else
+        {
+            if (v_cl.getProcessUnitID() == 0)
+            {
+                std::cout << "TIME: " << t << "  " << it_time.getwct() << "   " << v_cl.getProcessUnitID() << "   " << cnt << "    Max visc: " << max_visc << std::endl;
+            }
         }
     }
     openfpm_finalize();
