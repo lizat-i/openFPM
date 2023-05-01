@@ -124,8 +124,10 @@ int main(int argc, char *argv[])
     // Evolve
     size_t write = 0;
     size_t it = 0;
+    size_t debug_iterator = 0;
     size_t it_reb = 0;
     double t = 0.0;
+
     while (t <= t_end)
     {   
         std::cout << "Cluster stuf" << std::endl;
@@ -151,7 +153,7 @@ int main(int argc, char *argv[])
         vd.ghost_get<type, rho, Pressure, velocity>();
         // Calc forces
         std::cout << "Calc non pressure forces" << std::endl;
-        calc_nonPforces(vd, NN, max_visc);
+        calc_nonPforces(vd, NN, max_visc,debug_iterator);
         std::cout << "maxing" << std::endl;
         v_cl.max(max_visc);
         std::cout << "execute parallel shit" << std::endl;
@@ -201,7 +203,7 @@ int main(int argc, char *argv[])
        */
 
         cheng_int(vd, dt);
-
+        ++debug_iterator;
         t += dt;
         if (it_reb == 1)
         {
