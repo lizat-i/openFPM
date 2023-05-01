@@ -71,11 +71,18 @@ const int velocity = 6;
 // velocity at previous step
 const int velocity_prev = 7;
 // Type of the vector containing particles
-typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3]>> particles;
-//                                       |      |        |          |            |            |         |            |
-//                                       |      |        |          |            |            |         |            |
-//                                     type   density   density    Pressure    delta       force     velocity    velocity
-//                                                      at n-1                 density                           at n - 1
+const int x_pre = 8;
+// Type of the vector containing particles
+const int v_pre = 9;
+// Type of the vector containing particles
+const int rho_pred = 10;
+// Type of the vector containing particles
+
+typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3]  , double[3]  , double[3]  , double  >> particles;
+//                                       |      |        |         |         |         |         |            |            |            |        |   
+//                                       |      |        |         |         |         |         |            |            |            |        |   
+//                                     type   density   density   Pressure delta    force     velocity    velocityy    position    velocityy    density
+//                                                      at n-1             density                        at n - 1     predicted   predicted     prediced
 struct ModelCustom
 {
     template <typename Decomposition, typename vector>
