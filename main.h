@@ -179,6 +179,7 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
         double v_force_x = 0.0;
         double v_force_y = 0.0;
         double v_force_z = 0.0;
+
         double viscosityaveraging  = (2*dynamic_viscosity*dynamic_viscosity)/(dynamic_viscosity+dynamic_viscosity);
 
         vd.template getProp<drho>(a) = 0.0;
@@ -210,12 +211,13 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
                     Point<3, double> v_rel = va - vb;
                     Point<3, double> DW;
                     double r = sqrt(r2);
+                    Point<3, double> e_ab = dr/r;
 
                     Vb = (massb / rhob);
 
                     DWab(dr, DW, r, false);
                     
-                    double factor = (viscosityaveraging)*(Vb * Vb + Va * Va) *(DW.get(0)*dr.get(0)/r +  DW.get(1)*dr.get(1)/r + DW.get(2)*dr.get(2)/r) ;
+                    double factor = (viscosityaveraging)*(Vb * Vb + Va * Va) *(DW.get(0)*e_ab.get(0) +  DW.get(1)*e_ab.get(1) + DW.get(2)*e_ab.get(2)) ;
 
                     v_force_x += factor * v_rel.get(0)/r  ;
                     v_force_y += factor * v_rel.get(1)/r  ;
@@ -225,9 +227,9 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
                 }
                 ++Np;
             }
-            vd.getProp<vicous_force>(a)[0] = v_force_x / massa;
-            vd.getProp<vicous_force>(a)[1] = v_force_y / massa;
-            vd.getProp<vicous_force>(a)[2] = v_force_z / massa;
+            vd.getProp<vicous_force>(a)[0] = v_force_x / massa*0 ;
+            vd.getProp<vicous_force>(a)[1] = v_force_y / massa*0 ;
+            vd.getProp<vicous_force>(a)[2] = v_force_z / massa*0 ;
         }
         ++part;
     }
