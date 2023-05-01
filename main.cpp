@@ -46,6 +46,12 @@ int main(int argc, char *argv[])
         vd.getLastPos()[0] = fluid_it.get().get(0);
         vd.getLastPos()[1] = fluid_it.get().get(1);
         vd.getLastPos()[2] = fluid_it.get().get(2);
+
+        vd.template getLastProp<pos_prev>()[0] = vd.getLastPos()[0];
+        vd.template getLastProp<pos_prev>()[1] = vd.getLastPos()[1];
+        vd.template getLastProp<pos_prev>()[2] = vd.getLastPos()[2];
+        
+
         // and its type.
         vd.template getLastProp<type>() = FLUID;
         // We also initialize the density of the particle and the hydro-static pressure given by
@@ -83,6 +89,9 @@ int main(int argc, char *argv[])
         vd.getLastPos()[0] = bound_box.get().get(0);
         vd.getLastPos()[1] = bound_box.get().get(1);
         vd.getLastPos()[2] = bound_box.get().get(2);
+        vd.template getLastProp<pos_prev>()[0] = vd.getLastPos()[0];
+        vd.template getLastProp<pos_prev>()[1] = vd.getLastPos()[1];
+        vd.template getLastProp<pos_prev>()[2] = vd.getLastPos()[2];
         vd.template getLastProp<type>() = BOUNDARY;
         vd.template getLastProp<rho>() = rho_zero;
         vd.template getLastProp<rho_prev>() = rho_zero;
@@ -102,6 +111,11 @@ int main(int argc, char *argv[])
         vd.getLastPos()[0] = obstacle_box.get().get(0);
         vd.getLastPos()[1] = obstacle_box.get().get(1);
         vd.getLastPos()[2] = obstacle_box.get().get(2);
+
+        vd.template getLastProp<pos_prev>()[0] = vd.getLastPos()[0];
+        vd.template getLastProp<pos_prev>()[1] = vd.getLastPos()[1];
+        vd.template getLastProp<pos_prev>()[2] = vd.getLastPos()[2];
+
         vd.template getLastProp<type>() = BOUNDARY;
         vd.template getLastProp<rho>() = rho_zero;
         vd.template getLastProp<rho_prev>() = rho_zero;

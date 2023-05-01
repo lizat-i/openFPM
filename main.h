@@ -82,7 +82,7 @@ const int force_pressure = 8;
 // velocity at previous step
 const int vel_predicted = 9;
 // velocity at previous step
-const int pos_predicted = 10;
+const int pos_prev = 10;
 // velocity at previous step
 const int density_predicted = 11;
 // Type of the vector containing particles
@@ -334,7 +334,7 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
                     ++Np;
                     continue;
                 };
-                Point<3, double> xb = vd.getProp<pos_predicted>(b);
+                Point<3, double> xb = vd.getProp<pos_prev>(b);
                 Point<3, double> dr = xa - xb;
                 double pressure_b = vd.getProp<Pressure>(b);
                 double rhob = vd.getProp<rho>(b);
@@ -370,7 +370,7 @@ inline void calc_forces_pressure(particles &vd, CellList &NN, double &max_visc)
     while (part.isNext())
     {
         auto a = part.get();
-        Point<3, double> xa = vd.getProp<pos_predicted>(a);
+        Point<3, double> xa = vd.getProp<pos_prev>(a);
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<density_predicted>(a);
         double Pa = vd.getProp<Pressure>(a);
@@ -388,7 +388,7 @@ inline void calc_forces_pressure(particles &vd, CellList &NN, double &max_visc)
                     continue;
                 };
 
-                Point<3, double> xb = vd.getProp<pos_predicted>(b);
+                Point<3, double> xb = vd.getProp<pos_prev>(b);
                 Point<3, double> dr = xa - xb;
 
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
@@ -554,17 +554,22 @@ void euler_int(particles &vd, double dt)
         double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt205;
         double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt205;
         double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt205;
+
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
         vd.getPos(a)[2] += dz;
+
         double velX = vd.template getProp<velocity>(a)[0];
         double velY = vd.template getProp<velocity>(a)[1];
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
+
         vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<force_pressure>(a)[0]) * dt;
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt;
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
+
         vd.template getProp<rho>(a) = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
+        
         // Check if the particle go out of range in space and in density
         if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
             vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
@@ -620,11 +625,18 @@ void cheng_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[1] += (vd.template getProp<force>(a)[1] + vd.template getProp<force_pressure>(a)[1]) * dt;
         vd.template getProp<velocity>(a)[2] += (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
 
-        vd.getPos(a)[0] += (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt * 0.5;
-        vd.getPos(a)[1] += (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt * 0.5;
-        vd.getPos(a)[2] += (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt * 0.5;
+        
+        
 
-        vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
+        vd.getPos(a)[0] = vd.template getProp<pos_prev>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt * 0.5;
+        vd.getPos(a)[1] = vd.template getProp<pos_prev>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt * 0.5;
+        vd.getPos(a)[2] = vd.template getProp<pos_prev>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt * 0.5;
+
+        vd.template getProp<pos_prev>(a)[0] =   vd.getPos(a)[0] ; 
+        vd.template getProp<pos_prev>(a)[1] =   vd.getPos(a)[1] ; 
+        vd.template getProp<pos_prev>(a)[2] =   vd.getPos(a)[2] ; 
+
+       vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
         vd.template getProp<rho>(a) += dt * vd.template getProp<drho>(a);
 
         // Check if the particle go out of range in space and in density
@@ -721,9 +733,9 @@ inline void predictPositionAndVelocity(particles &vd, CellList &NN, double &dt, 
             vd.template getProp<vel_predicted>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<force_pressure>(a)[2]) * dt;
 
             //  Predict spatial Coordinates
-            vd.template getProp<pos_predicted>(a)[0] = vd.getPos(a)[0] + (vd.template getProp<velocity>(a)[0] + vd.template getProp<vel_predicted>(a)[0]) * dt05;
-            vd.template getProp<pos_predicted>(a)[1] = vd.getPos(a)[1] + (vd.template getProp<velocity>(a)[1] + vd.template getProp<vel_predicted>(a)[1]) * dt05;
-            vd.template getProp<pos_predicted>(a)[2] = vd.getPos(a)[2] + (vd.template getProp<velocity>(a)[2] + vd.template getProp<vel_predicted>(a)[2]) * dt05;
+            vd.template getProp<pos_prev>(a)[0] = vd.getPos(a)[0] + (vd.template getProp<velocity>(a)[0] + vd.template getProp<vel_predicted>(a)[0]) * dt05;
+            vd.template getProp<pos_prev>(a)[1] = vd.getPos(a)[1] + (vd.template getProp<velocity>(a)[1] + vd.template getProp<vel_predicted>(a)[1]) * dt05;
+            vd.template getProp<pos_prev>(a)[2] = vd.getPos(a)[2] + (vd.template getProp<velocity>(a)[2] + vd.template getProp<vel_predicted>(a)[2]) * dt05;
         }
         ++it;
     };
@@ -745,7 +757,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
         double rhoa = vd.getProp<rho>(a);
         double Pa = vd.getProp<Pressure>(a);
 
-        Point<3, double> xa = vd.getProp<pos_predicted>(a);
+        Point<3, double> xa = vd.getProp<pos_prev>(a);
         Point<3, double> va = vd.getProp<vel_predicted>(a);
 
         if (vd.getProp<type>(a) == FLUID)
@@ -767,7 +779,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &dt, doub
                     continue;
                 };
 
-                Point<3, double> xb = vd.getProp<pos_predicted>(b);
+                Point<3, double> xb = vd.getProp<pos_prev>(b);
                 Point<3, double> vb = vd.getProp<vel_predicted>(b);
                 Point<3, double> dr = xa - xb;
 
