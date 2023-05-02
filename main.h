@@ -310,6 +310,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             }
             firstTermBeta_scalar = firstTermBeta_vectorial.get(0)*firstTermBeta_vectorial.get(0) +firstTermBeta_vectorial.get(1) * firstTermBeta_vectorial.get(1) +firstTermBeta_vectorial.get(2)*firstTermBeta_vectorial.get(2)    ;
             pressureKoefficient = (rho_zero*rho_zero)/(dt*dt *(firstTermBeta_scalar + secondTermBeta_scalar));
+            
             vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt ;
             rho_e_abs = vd.getProp<rho>(a) - rho_zero           ;
 
