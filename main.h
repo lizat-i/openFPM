@@ -265,7 +265,6 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
         double Pa = vd.getProp<Pressure>(a);
         double drho = 0;
         double pressureKoefficient = 0;
-
         Point<3, double> term_1_vec;
         double term_1_sca = 0;
         double term_2_sca = 0;
@@ -301,13 +300,16 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
+                    
                     drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                     term_1_vec += massb * DW;
                     term_2_sca += massa * massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
+
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
+
             pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * (term_1_sca + term_2_sca));
             vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt;
             rho_e_abs = vd.getProp<rho>(a) - rho_zero;
@@ -315,7 +317,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             rho_e = std::abs((rho_e_abs) / rho_zero);
             rho_e_max = std::max(rho_e_max, rho_e);
 
-            vd.getProp<Pressure>(a) = pressureKoefficient * rho_e_abs;
+            vd.getProp<Pressure>(a) += pressureKoefficient * rho_e_abs;
         }
 
         ++part;
