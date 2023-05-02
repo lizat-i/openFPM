@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     size_t it = 0;
     size_t it_reb = 0;
     double t = 0.0;
-    
+
     double dt = DtMin;
 
     while (t <= t_end)
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
         while (pressureIteration < pressureIteration_min || rho_e_max > compressibility)
         {
             predict_v_and_x(vd, NN,dt);
-            EqState_incompressible(vd, NN, max_visc, rho_e_max);
+            EqState_incompressible(vd, NN, max_visc, rho_e_max, dt);
             calc_PressureForces(vd, NN, max_visc);
             extrapolate_Boundaries(vd, NN, max_visc);
             ++pressureIteration;
