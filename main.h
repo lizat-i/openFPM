@@ -540,14 +540,13 @@ void euler_int(particles &vd, double dt)
     // increment the iteration counter
     cnt++;
 }
-void cheng_int(particles &vd, double dt)
+void peng_int(particles &vd, double dt)
 {
     // list of the particle to remove
     to_remove.clear();
     // particle iterator
     auto part = vd.getDomainIterator();
     double dt05 = dt  * 0.5;
-    double dt2 = dt * 2.0;
     // For each particle ...
     while (part.isNext())
     {
@@ -556,7 +555,7 @@ void cheng_int(particles &vd, double dt)
         // if the particle is boundary
         if (vd.template getProp<type>(a) == BOUNDARY)
         {
-            double rhop = vd.template getProp<rho>(a);
+            //double rhop = vd.template getProp<rho>(a);
             // Update only the density
 
             vd.template getProp<velocity>(a)[1] = 0.0;
@@ -576,7 +575,7 @@ void cheng_int(particles &vd, double dt)
         vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1] )*dt05;
         vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2] )*dt05;
 
-        double rho_candidate = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
+        double rho_candidate = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
         // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
@@ -589,7 +588,6 @@ void cheng_int(particles &vd, double dt)
             to_remove.add(a.getKey());
         }
 
-
         vd.template getProp<velocity_prev>(a)[0] = vd.template getProp<velocity>(a)[0];
         vd.template getProp<velocity_prev>(a)[1] = vd.template getProp<velocity>(a)[1];
         vd.template getProp<velocity_prev>(a)[2] = vd.template getProp<velocity>(a)[2];
@@ -598,9 +596,7 @@ void cheng_int(particles &vd, double dt)
         vd.template getProp<x_pre>(a)[1] = vd.getPos(a)[1];
         vd.template getProp<x_pre>(a)[2] = vd.getPos(a)[2];
 
-        double rhop = vd.template getProp<rho>(a);
-
-        vd.template getProp<rho_prev>(a) = rhop;
+        vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);;
         ++part;
     }
     // remove the particles
