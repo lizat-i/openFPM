@@ -312,10 +312,10 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
             pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * (term_1_sca + term_2_sca));
             vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt;
-            rho_e_abs = vd.getProp<rho>(a) - rho_zero;
 
-            rho_e = std::abs((rho_e_abs) / rho_zero);
-            rho_e_max = std::max(rho_e_max, rho_e);
+            rho_e_abs = vd.getProp<rho>(a) - rho_zero   ;
+            rho_e = std::abs((rho_e_abs) / rho_zero)    ;
+            rho_e_max = std::max(rho_e_max, rho_e)      ;
 
             vd.getProp<Pressure>(a) += pressureKoefficient * rho_e_abs;
         }
