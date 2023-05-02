@@ -88,6 +88,11 @@ int main(int argc, char *argv[])
             vd.getLastPos()[0] = toFill.get().get(0);
             vd.getLastPos()[1] = toFill.get().get(1);
             vd.getLastPos()[2] = toFill.get().get(2);
+
+        vd.template getLastProp<x_pre>()[0] = vd.getLastPos()[0];
+        vd.template getLastProp<x_pre>()[1] = vd.getLastPos()[1];
+        vd.template getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+
             vd.template getLastProp<type>() = BOUNDARY;
             vd.template getLastProp<rho>() = rho_zero;
             vd.template getLastProp<rho_prev>() = rho_zero;
