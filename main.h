@@ -248,7 +248,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
     auto part = vd.getDomainIterator();
 
     vd.updateCellList(NN);
-    double rho_e_abs;
+    double density_pred_error;
     double rho_e;
 
     while (part.isNext())
@@ -258,17 +258,18 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
         Point<3, double> xa = vd.getPos(a);
         Point<3, double> va = vd.getProp<velocity>(a);
+        Point<3, double> term_1_vec;
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
         double Va = (massa / rhoa);
         double Pa = vd.getProp<Pressure>(a);
         double drho = 0;
-        double pressureKoefficient = 0;
-        Point<3, double> term_1_vec;
-        double term_1_sca = 0;
-        double term_2_sca = 0;
-        double kernel = 0;
+        double pressureKoefficient = 0.0;
+        
+        double term_1_sca = 0.0;
+        double term_2_sca = 0.0;
+        double kernel = 0.0;
 
         if (vd.getProp<type>(a) == FLUID)
         {
@@ -313,11 +314,11 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * (term_1_sca + term_2_sca));
             vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt;
 
-            rho_e_abs = vd.getProp<rho>(a) - rho_zero   ;
-            rho_e = std::abs((rho_e_abs) / rho_zero)    ;
+            density_pred_error = vd.getProp<rho>(a) - rho_zero   ;
+            rho_e = std::abs((density_pred_error) / rho_zero)    ;
             rho_e_max = std::max(rho_e_max, rho_e)      ;
 
-            vd.getProp<Pressure>(a) += pressureKoefficient * rho_e_abs;
+            vd.getProp<Pressure>(a) += pressureKoefficient * density_pred_error;
         }
 
         ++part;
@@ -772,11 +773,6 @@ void predict_v_and_x(particles &vd, CellList &NN, double dt)
             ++part;
             continue;
         }
-
-        //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double vel_interm_x = vd.template getProp<velocity>(a)[0];
-        double vel_interm_y = vd.template getProp<velocity>(a)[1];
-        double vel_interm_z = vd.template getProp<velocity>(a)[2];
 
         vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<vicous_force>(a)[0] + vd.template getProp<force_p>(a)[0] + bodyforce[0]) * dt;
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] + bodyforce[1]) * dt;

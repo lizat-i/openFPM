@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
         double max_visc = 0.0;
         vd.ghost_get<type, rho, Pressure, velocity>();
         // Calc forces
-        size_t pressureIteration = 0.0;
+        size_t pressureIteration ;
         size_t pressureIteration_min = 3.0;
         double rho_e_max = 0.00;
         double compressibility = 0.01;
@@ -149,7 +149,9 @@ int main(int argc, char *argv[])
         calc_forces_and_drho(vd, NN, max_visc);
 
         while (pressureIteration < pressureIteration_min || rho_e_max > compressibility)
-        {
+        {   
+            pressureIteration = 0.0;
+
             predict_v_and_x(vd, NN, dt);
             EqState_incompressible(vd, NN, max_visc, rho_e_max, dt);
             extrapolate_Boundaries(vd, NN, max_visc);
