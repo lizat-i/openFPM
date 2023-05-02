@@ -83,9 +83,9 @@ const int force_p = 11;
 // Type of the vector containing particles
 const double bodyforce[3] = {0.0, 0.0, -9.81};
 
-#define LOG(x) std::cout<<x<<'\n'
+#define LOG(x) std::cout << x << '\n'
 
-#define LOGdouble(x,y) std::cout<<x<<"  " <<y<<'\n'
+#define LOGdouble(x, y) std::cout << x << "  " << y << '\n'
 
 typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3], double, double[3]>> particles;
 //                                       |        |        |       |         |        |       |           |           |
@@ -247,9 +247,9 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 {
     auto part = vd.getDomainIterator();
 
-    vd.updateCellList(NN)   ;
-    double rho_e_abs        ;
-    double rho_e            ;
+    vd.updateCellList(NN);
+    double rho_e_abs;
+    double rho_e;
 
     while (part.isNext())
     {
@@ -266,10 +266,10 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
         double drho = 0;
         double pressureKoefficient = 0;
 
-        Point<3, double> firstTermBeta_vectorial ;
-        double firstTermBeta_scalar     = 0 ;
-        double secondTermBeta_scalar    = 0 ;
-        double kernel                   = 0 ;
+        Point<3, double> term_1_vec;
+        double term_1_sca = 0;
+        double term_2_sca = 0;
+        double kernel = 0;
 
         if (vd.getProp<type>(a) == FLUID)
         {
@@ -301,28 +301,25 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
-                    drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2))         ;
-                    firstTermBeta_vectorial     += massb *DW                                                                    ;
-                    secondTermBeta_scalar       += massa*massb*(DW.get(0)*DW.get(0) +DW.get(1) * DW.get(1) +DW.get(2)*DW.get(2))  ;
-                    
+                    drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
+                    term_1_vec += massb * DW;
+                    term_2_sca += massa * massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
-            }
-            firstTermBeta_scalar = firstTermBeta_vectorial.get(0)*firstTermBeta_vectorial.get(0) +firstTermBeta_vectorial.get(1) * firstTermBeta_vectorial.get(1) +firstTermBeta_vectorial.get(2)*firstTermBeta_vectorial.get(2)    ;
-            pressureKoefficient = (rho_zero*rho_zero)/(dt*dt *(firstTermBeta_scalar + secondTermBeta_scalar));
-            
-            vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt ;
-            rho_e_abs = vd.getProp<rho>(a) - rho_zero           ;
+            };
+            term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
+            pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * (term_1_sca + term_2_sca));
+            vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt;
+            rho_e_abs = vd.getProp<rho>(a) - rho_zero;
 
-            rho_e = std::abs((rho_e_abs - rho_zero) / rho_zero)       ;
-            rho_e_max = std::max(rho_e_max, rho_e)              ;
+            rho_e = std::abs((rho_e_abs) / rho_zero);
+            rho_e_max = std::max(rho_e_max, rho_e);
 
-            vd.getProp<Pressure>(a) = pressureKoefficient * rho_e_abs ;
+            vd.getProp<Pressure>(a) = pressureKoefficient * rho_e_abs;
         }
 
         ++part;
     }
-
 }
 
 template <typename CellList>
