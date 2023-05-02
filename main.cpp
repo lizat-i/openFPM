@@ -88,15 +88,9 @@ int main(int argc, char *argv[])
             vd.getLastPos()[1] = toFill.get().get(1);
             vd.getLastPos()[2] = toFill.get().get(2);
 
-<<<<<<< HEAD
             vd.template getLastProp<x_pre>()[0] = vd.getLastPos()[0];
             vd.template getLastProp<x_pre>()[1] = vd.getLastPos()[1];
             vd.template getLastProp<x_pre>()[2] = vd.getLastPos()[2];
-=======
-        vd.template getLastProp<x_pre>()[0] = vd.getLastPos()[0];
-        vd.template getLastProp<x_pre>()[1] = vd.getLastPos()[1];
-        vd.template getLastProp<x_pre>()[2] = vd.getLastPos()[2];
->>>>>>> f1a02410528290352678d93c7fba9810aad3f3d4
 
             vd.template getLastProp<type>() = BOUNDARY;
             vd.template getLastProp<rho>() = rho_zero;
@@ -124,6 +118,9 @@ int main(int argc, char *argv[])
     size_t it = 0;
     size_t it_reb = 0;
     double t = 0.0;
+    
+    double dt = DtMin;
+
     while (t <= t_end)
     {
         Vcluster<> &v_cl = create_vcluster();
@@ -140,18 +137,31 @@ int main(int argc, char *argv[])
         }
         vd.map();
         // Calculate pressure from the density
-        EqState(vd);
+
         double max_visc = 0.0;
         vd.ghost_get<type, rho, Pressure, velocity>();
         // Calc forces
+        size_t pressureIteration = 0.0;
+        size_t pressureIteration_min = 3.0;
+        double rho_e_max = 0.01;
+        double compressibility = 0.01;
+        
         calc_forces_and_drho(vd, NN, max_visc);
-        calc_PressureForces(vd, NN, max_visc);
-        extrapolate_Boundaries(vd, NN, max_visc);
+
+        while (pressureIteration < pressureIteration_min || rho_e_max > compressibility)
+        {
+            predict_v_and_x(vd, NN,dt);
+            EqState_incompressible(vd, NN, max_visc, rho_e_max);
+            calc_PressureForces(vd, NN, max_visc);
+            extrapolate_Boundaries(vd, NN, max_visc);
+            ++pressureIteration;
+        }
+
         // Get the maximum viscosity term across processors
         v_cl.max(max_visc);
         v_cl.execute();
         // Calculate delta t integration
-        double dt = calc_deltaT(vd, max_visc);
+        dt = calc_deltaT(vd, max_visc);
         // VerletStep or euler step
         it++;
         if (it < 40)
