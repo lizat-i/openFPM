@@ -174,7 +174,6 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
         double Va = (massa / rhoa);
-        double Pa = vd.getProp<Pressure>(a);
 
         vd.template getProp<vicous_force>(a)[0] = 0.0;
         vd.template getProp<vicous_force>(a)[1] = 0.0;
@@ -183,14 +182,14 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
         vd.template getProp<force_p>(a)[0] = 0.0;
         vd.template getProp<force_p>(a)[1] = 0.0;
         vd.template getProp<force_p>(a)[2] = 0.0;
+        vd.template getProp<Pressure>(a) = 0.0;
+
 
         double v_force_x = 0.0;
         double v_force_y = 0.0;
         double v_force_z = 0.0;
 
         double viscosityaveraging = (2 * dynamic_viscosity * dynamic_viscosity) / (dynamic_viscosity + dynamic_viscosity);
-
-        vd.template getProp<drho>(a) = 0.0;
 
         if (vd.getProp<type>(a) == FLUID)
         {
@@ -209,7 +208,6 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
                 Point<3, double> dr = xa - xb;
 
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
-                double Pb = vd.getProp<Pressure>(b);
                 double rhob = vd.getProp<rho>(b);
                 double Vb = (massa / rhoa);
                 double r2 = norm2(dr);
@@ -230,8 +228,6 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
                     v_force_x += factor * v_rel.get(0) / r;
                     v_force_y += factor * v_rel.get(1) / r;
                     v_force_z += factor * v_rel.get(2) / r;
-
-                    vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                 }
                 ++Np;
             }
@@ -343,10 +339,6 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
         double Va = (massa / rhoa);
         double Pa = vd.getProp<Pressure>(a);
 
-        vd.template getProp<force_p>(a)[0] = 0.0;
-        vd.template getProp<force_p>(a)[1] = 0.0;
-        vd.template getProp<force_p>(a)[2] = 0.0;
-
         double p_force_x = 0.0;
         double p_force_y = 0.0;
         double p_force_z = 0.0;
@@ -381,7 +373,7 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
-                    double factor = -(Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
+                    double factor = (-1)*(Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
 
                     p_force_x += factor * DW.get(0);
                     p_force_y += factor * DW.get(1);
