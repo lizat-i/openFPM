@@ -488,7 +488,7 @@ void euler_int(particles &vd, double dt)
         {
             double rhop = vd.template getProp<rho>(a);
             // Update only the density
-            vd.template getProp<velocity>(a)[0] = 0.0;
+
             vd.template getProp<velocity>(a)[1] = 0.0;
             vd.template getProp<velocity>(a)[2] = 0.0;
             ++part;
@@ -499,9 +499,14 @@ void euler_int(particles &vd, double dt)
         double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] + bodyforce[1]) * dt205;
         double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<vicous_force>(a)[2] + vd.template getProp<force_p>(a)[2] + bodyforce[2]) * dt205;
         
-        vd.getPos(a)[0] += dx;
-        vd.getPos(a)[1] += dy;
-        vd.getPos(a)[2] += dz;
+        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + dx;
+        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + dy;
+        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + dz;
+
+        vd.template getProp<x_pre>(a)[0] = vd.getPos(a)[0];
+        vd.template getProp<x_pre>(a)[1] = vd.getPos(a)[1];
+        vd.template getProp<x_pre>(a)[2] = vd.getPos(a)[2];
+
         double velX = vd.template getProp<velocity>(a)[0];
         double velY = vd.template getProp<velocity>(a)[1];
         double velZ = vd.template getProp<velocity>(a)[2];
@@ -535,6 +540,77 @@ void euler_int(particles &vd, double dt)
     // increment the iteration counter
     cnt++;
 }
+void cheng_int(particles &vd, double dt)
+{
+    // list of the particle to remove
+    to_remove.clear();
+    // particle iterator
+    auto part = vd.getDomainIterator();
+    double dt05 = dt  * 0.5;
+    double dt2 = dt * 2.0;
+    // For each particle ...
+    while (part.isNext())
+    {
+        // ... a
+        auto a = part.get();
+        // if the particle is boundary
+        if (vd.template getProp<type>(a) == BOUNDARY)
+        {
+            double rhop = vd.template getProp<rho>(a);
+            // Update only the density
+
+            vd.template getProp<velocity>(a)[1] = 0.0;
+            vd.template getProp<velocity>(a)[2] = 0.0;
+            ++part;
+            continue;
+        }
+
+
+        //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
+
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<vicous_force>(a)[0] + vd.template getProp<force_p>(a)[0] + bodyforce[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] + bodyforce[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<vicous_force>(a)[2] + vd.template getProp<force_p>(a)[2] + bodyforce[2]) * dt;
+
+        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0] )*dt05;
+        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1] )*dt05;
+        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2] )*dt05;
+
+        double rho_candidate = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
+        vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
+        // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
+
+        // Check if the particle go out of range in space and in density
+        if (vd.getPos(a)[0] < 0.000263878 || vd.getPos(a)[1] < 0.000263878 || vd.getPos(a)[2] < 0.000263878 ||
+            vd.getPos(a)[0] > 0.000263878 + 1.59947 || vd.getPos(a)[1] > 0.000263878 + 0.672972 || vd.getPos(a)[2] > 0.000263878 + 0.903944 ||
+            vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
+        {
+            std::cout<<"removing stuff"<<'\n';
+            to_remove.add(a.getKey());
+        }
+
+
+        vd.template getProp<velocity_prev>(a)[0] = vd.template getProp<velocity>(a)[0];
+        vd.template getProp<velocity_prev>(a)[1] = vd.template getProp<velocity>(a)[1];
+        vd.template getProp<velocity_prev>(a)[2] = vd.template getProp<velocity>(a)[2];
+
+        vd.template getProp<x_pre>(a)[0] = vd.getPos(a)[0];
+        vd.template getProp<x_pre>(a)[1] = vd.getPos(a)[1];
+        vd.template getProp<x_pre>(a)[2] = vd.getPos(a)[2];
+
+        double rhop = vd.template getProp<rho>(a);
+
+        vd.template getProp<rho_prev>(a) = rhop;
+        ++part;
+    }
+    // remove the particles
+    vd.remove(to_remove, 0);
+    // increment the iteration counter
+    cnt++;
+}
+
+
+
 template <typename Vector, typename CellList>
 inline void sensor_pressure(Vector &vd,
                             CellList &NN,

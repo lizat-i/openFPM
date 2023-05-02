@@ -36,6 +36,12 @@ int main(int argc, char *argv[])
         vd.getLastPos()[0] = fluid_it.get().get(0);
         vd.getLastPos()[1] = fluid_it.get().get(1);
         vd.getLastPos()[2] = fluid_it.get().get(2);
+
+
+        vd.template getLastProp<x_pre>()[0] = vd.getLastPos()[0];
+        vd.template getLastProp<x_pre>()[1] = vd.getLastPos()[1];
+        vd.template getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+
         vd.template getLastProp<type>() = FLUID;
         vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
         vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
@@ -139,10 +145,10 @@ int main(int argc, char *argv[])
         // VerletStep or euler step
         it++;
         if (it < 40)
-            verlet_int(vd, dt);
+            cheng_int(vd, dt);
         else
         {
-            euler_int(vd, dt);
+            cheng_int(vd, dt);
             it = 0;
         }
         t += dt;
