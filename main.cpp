@@ -173,6 +173,8 @@ int main(int argc, char *argv[])
             std::cout << "predict x v" << std::endl;
             predictPositionAndVelocity(vd, NN, dt, max_visc, rel_rho_predicted_error_max);
             std::cout << "pressure and density calc" << std::endl;
+            vd.ghost_get<type, rho, Pressure, velocity>();
+            vd.map();
             EqState_incompressible(vd, NN, dt, max_visc, rel_rho_predicted_error_max);
             std::cout << "extrapolate boundaries" << std::endl;
             extrapolate_Boundaries(vd, NN, max_visc);

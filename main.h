@@ -280,7 +280,7 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
 
         if (vd.getProp<type>(a) != FLUID)
         {
-e
+            Point<3, double> xa = vd.getProp<pos_predicted>(a);
             double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
             double rhoa = vd.getProp<rho>(a);
             double Pa = vd.getProp<Pressure>(a);
@@ -314,8 +314,8 @@ e
                 ++Np;
             }
 
-            vd.getProp<rho>(a) = (kernel > eps) ? rho_wab / kernel : rho_zero           ;
-            vd.getProp<Pressure>(a) = (kernel > eps) ? (p_wab + g_wab) / kernel : 0.0   ;
+            vd.getProp<rho>(a) = (rho_wab / kernel > rho_zero) ? rho_wab / kernel : rho_zero           ;
+            vd.getProp<Pressure>(a) = ((p_wab + g_wab) / kernel > 0) ? (p_wab + g_wab) / kernel : 0.0   ;
         }
         ++part;
     }
