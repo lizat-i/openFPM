@@ -83,6 +83,10 @@ const int force_p = 11;
 // Type of the vector containing particles
 const double bodyforce[3] = {0.0, 0.0, -9.81};
 
+#define LOG(x) std::cout<<x<<'\n'
+
+#define LOGdouble(x,y) std::cout<<x<<"  " <<y<<'\n'
+
 typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3], double, double[3]>> particles;
 //                                       |        |        |       |         |        |       |           |           |
 //                                       |        |        |       |         |        |       |           |           |
@@ -267,14 +271,6 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
         double secondTermBeta_scalar    = 0 ;
         double kernel                   = 0 ;
 
-        // vd.template getProp<force_p>(a)[0] = 0.0;
-        // vd.template getProp<force_p>(a)[1] = 0.0;
-        // vd.template getProp<force_p>(a)[2] = 0.0;
-
-        // double p_force_x = 0.0;
-        // double p_force_y = 0.0;
-        // double p_force_z = 0.0;
-
         if (vd.getProp<type>(a) == FLUID)
         {
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
@@ -305,20 +301,19 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
-                    drho += massb * (vrel.get(0) * DWab.get(0) + vrel.get(1) * DWab.get(1) + vrel.get(2) * DWab.get(2))         ;
+                    drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2))         ;
                     firstTermBeta_vectorial     += massb *DW                                                                    ;
                     secondTermBeta_scalar       += massa*massb*(DW.get(0)*DW.get(0) +DW.get(1) * DW.get(1) +DW.get(2)*DW.get(2))  ;
                     
-                    p_force_y += factor * DW.get(1);
-                    p_force_z += factor * DW.get(2);
                 }
                 ++Np;
             }
             firstTermBeta_scalar = firstTermBeta_vectorial.get(0)*firstTermBeta_vectorial.get(0) +firstTermBeta_vectorial.get(1) * firstTermBeta_vectorial.get(1) +firstTermBeta_vectorial.get(2)*firstTermBeta_vectorial.get(2)    ;
             pressureKoefficient = (rho_zero*rho_zero)/(dt*dt *(firstTermBeta_scalar + secondTermBeta_scalar));
-            vd.getProp<rho>(a) = vd.getProp<rho>(a) + drho * dt ;
-            rho_e_abs = rho - rho_zero                          ;
-            rho_e = std::abs((rho - rho_zero) / rho_zero)       ;
+            vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt ;
+            rho_e_abs = vd.getProp<rho>(a) - rho_zero           ;
+
+            rho_e = std::abs((rho_e_abs - rho_zero) / rho_zero)       ;
             rho_e_max = std::max(rho_e_max, rho_e)              ;
 
             vd.getProp<Pressure>(a) = pressureKoefficient * rho_e_abs ;
@@ -787,9 +782,9 @@ void predict_v_and_x(particles &vd, CellList &NN, double dt)
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] + bodyforce[1]) * dt;
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<vicous_force>(a)[2] + vd.template getProp<force_p>(a)[2] + bodyforce[2]) * dt;
 
-        vd.getPos(a)[0] = vd.template vd.getPos(a)[0] + (vel_interm_x + vd.template getProp<velocity>(a)[0]) * dt05;
-        vd.getPos(a)[1] = vd.template vd.getPos(a)[1] + (vel_interm_y + vd.template getProp<velocity>(a)[1]) * dt05;
-        vd.getPos(a)[2] = vd.template vd.getPos(a)[2] + (vel_interm_z + vd.template getProp<velocity>(a)[2]) * dt05;
+        vd.getPos(a)[0] = vd.getPos(a)[0] + (vel_interm_x + vd.template getProp<velocity>(a)[0]) * dt05;
+        vd.getPos(a)[1] = vd.getPos(a)[1] + (vel_interm_y + vd.template getProp<velocity>(a)[1]) * dt05;
+        vd.getPos(a)[2] = vd.getPos(a)[2] + (vel_interm_z + vd.template getProp<velocity>(a)[2]) * dt05;
 
         ++part;
     }
