@@ -112,9 +112,12 @@ int main(int argc, char *argv[])
     vd.getDecomposition().decompose();
     vd.map();
     vd.ghost_get<type, rho, Pressure, velocity>();
+
+    vd.write_frame("output/Geometry", 0);
+
     auto NN = vd.getCellList(2 * H);
     // Evolve
-    size_t write = 0;
+    size_t write = 1;
     size_t it = 0;
     size_t it_reb = 0;
     double t = 0.0;
@@ -139,6 +142,8 @@ int main(int argc, char *argv[])
         // Calculate pressure from the density
 
         double max_visc = 0.0;
+        //TODO  ghost_get performance
+        //      check which quantities are necesary
         vd.ghost_get<type, rho, rho_prev,vicous_force,drho,Pressure, velocity,force_p,v_pre,x_pre>();
         // Calc forces
         size_t pressureIteration = 0.0 ;
@@ -153,6 +158,8 @@ int main(int argc, char *argv[])
             rho_e_max = 0.0;
 
             predict_v_and_x(vd, NN, dt);
+            //TODO  Domain sync
+            //      check which quantities are necesary
             //vd.ghost_get<type, rho, rho_prev,vicous_force,drho,Pressure, velocity,force_p,v_pre,x_pre>();
             //vd.map();
             EqState_incompressible(vd, NN, max_visc, rho_e_max, dt);
@@ -175,6 +182,7 @@ int main(int argc, char *argv[])
         // Calculate delta t integration
         dt = calc_deltaT(vd, max_visc);
         // VerletStep or euler step
+        /*
         it++;
         if (it < 40)
             peng_int(vd, dt);
@@ -183,9 +191,13 @@ int main(int argc, char *argv[])
             peng_int(vd, dt);
             it = 0;
         }
+        */
+        peng_int(vd, dt);
+        it++;
+
         t += dt;
 
-        if (write < t * 100)
+        if (it%50 == 0)
         {
 
             // sensor_pressure calculation require ghost and update cell-list
@@ -196,7 +208,7 @@ int main(int argc, char *argv[])
             sensor_pressure(vd, NN, press_t, probes);
             vd.write_frame("output/Geometry", write);
             it_reb = 0;
-            write++;
+            //write++;
 
             if (v_cl.getProcessUnitID() == 0)
             {

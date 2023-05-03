@@ -298,25 +298,27 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     DWab(dr, DW, r, false);
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
-                    term_1_vec += massa * DW;
+                    term_1_vec += DW;
                     //TODO hier nur einmall masse und pcisph funktioniert
-                    term_2_sca += massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    term_2_sca += (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
 
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
             double beta = term_1_sca + term_2_sca;
-            pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * beta);
+            pressureKoefficient = (rho_zero * rho_zero) / (massa*dt * dt * beta);
             //TODO add comparisson using vd.getProp<rho_pred>(a) and assigning to real rho
             //  this would meand that the real densities are used for the calculations
             
             density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+            // vd.getProp<rho>(a) = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_max = std::max(rho_e_max, rho_e);
 
-            vd.getProp<Pressure>(a) += pressureKoefficient * density_pred_error;
+            double candidatePressure = vd.getProp<Pressure>(a)  + pressureKoefficient * density_pred_error  ;
+            vd.getProp<Pressure>(a) = (candidatePressure > 0) ? candidatePressure : 0                  ;
         }
 
         ++part;
@@ -661,7 +663,7 @@ void peng_int(particles &vd, double dt)
 
         //  TODO reached timestep is going to be wrong because of drho,
         //  proper handling needs to be assured
-        double rho_candidate = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
+        double rho_candidate = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
         // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
