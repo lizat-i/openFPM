@@ -30,6 +30,7 @@ int main(int argc, char *argv[])
     B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
     cbar = coeff_sound * sqrt(gravity * h_swl);
 
+    int NrOfFluidParticles = 0;
     while (fluid_it.isNext())
     {
         vd.add();
@@ -52,6 +53,7 @@ int main(int argc, char *argv[])
         vd.template getLastProp<velocity_prev>()[1] = 0.0;
         vd.template getLastProp<velocity_prev>()[2] = 0.0;
         ++fluid_it;
+        ++NrOfFluidParticles;
     }
 
     // Build domain with 6 boxes.
@@ -122,7 +124,7 @@ int main(int argc, char *argv[])
     size_t it_reb = 0;
     double t = 0.0;
 
-    double dt = DtMin;
+    double dt = DtInit;
 
     while (t <= t_end)
     {
@@ -142,37 +144,43 @@ int main(int argc, char *argv[])
         // Calculate pressure from the density
 
         double max_visc = 0.0;
-        //TODO  ghost_get performance
-        //      check which quantities are necesary
-        vd.ghost_get<type, rho, rho_prev,vicous_force,drho,Pressure, velocity,force_p,v_pre,x_pre>();
+        // TODO  ghost_get performance
+        //       check which quantities are necesary
+        vd.ghost_get<type, rho, rho_prev, vicous_force, drho, Pressure, velocity, force_p, v_pre, x_pre>();
         // Calc forces
-        size_t pressureIteration = 0.0 ;
+        size_t pressureIteration = 0.0;
         size_t pressureIteration_min = 3.0;
         double rho_e_max = 0.00;
+        double rho_e_mean = 0.00;
+
         double compressibility = 0.01;
 
         calc_forces_and_drho(vd, NN, max_visc);
 
         while (pressureIteration < pressureIteration_min || rho_e_max > compressibility)
-        {   
+        {
             rho_e_max = 0.0;
+            rho_e_mean = 0.0;
 
             predict_v_and_x(vd, NN, dt);
-            //TODO  Domain sync
-            //      check which quantities are necesary
-            //vd.ghost_get<type, rho, rho_prev,vicous_force,drho,Pressure, velocity,force_p,v_pre,x_pre>();
-            //vd.map();
-            EqState_incompressible(vd, NN, max_visc, rho_e_max, dt);
+            // TODO  Domain sync
+            //       check which quantities are necesary
+
+            vd.ghost_get<type, rho, rho_prev, vicous_force, drho, Pressure, velocity, force_p, v_pre, x_pre>();
+            vd.map();
+            EqState_incompressible(vd, NN, max_visc, rho_e_max, rho_e_mean, dt);
             extrapolate_Boundaries(vd, NN, max_visc);
             calc_PressureForces(vd, NN, max_visc);
 
             v_cl.max(rho_e_max);
             v_cl.execute();
 
-            if (rho_e_max>0.01){
-            LOGdouble("pressureIteration : ",pressureIteration)   ;
-            LOGdouble("error max : ",rho_e_max)                   ;
+            if (rho_e_max > 0.01 && v_cl.getProcessUnitID() == 0)
+            {
+                LOGdouble("pressureIteration : ", pressureIteration);
+                LOGdouble("error max : ", rho_e_max);
             }
+            rho_e_mean = rho_e_mean / NrOfFluidParticles;
             ++pressureIteration;
         }
 
@@ -180,7 +188,8 @@ int main(int argc, char *argv[])
         v_cl.max(max_visc);
         v_cl.execute();
         // Calculate delta t integration
-        dt = calc_deltaT(vd, max_visc);
+        //dt = calc_deltaT(vd, max_visc, rho_e_max, rho_e_mean);
+        dt = DtInit;
         // VerletStep or euler step
         /*
         it++;
@@ -197,7 +206,7 @@ int main(int argc, char *argv[])
 
         t += dt;
 
-        if (it%50 == 0)
+        if (it % 50 == 0)
         {
 
             // sensor_pressure calculation require ghost and update cell-list
@@ -208,7 +217,7 @@ int main(int argc, char *argv[])
             sensor_pressure(vd, NN, press_t, probes);
             vd.write_frame("output/Geometry", write);
             it_reb = 0;
-            //write++;
+            // write++;
 
             if (v_cl.getProcessUnitID() == 0)
             {
