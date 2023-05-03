@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
 
         t += dt;
 
-        if (it % 50 == 0)
+        if (it % 1 == 0)
         {
 
             // sensor_pressure calculation require ghost and update cell-list
