@@ -184,7 +184,6 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
         vd.template getProp<force_p>(a)[2] = 0.0;
         vd.template getProp<Pressure>(a) = 0.0;
 
-
         double v_force_x = 0.0;
         double v_force_y = 0.0;
         double v_force_z = 0.0;
@@ -262,10 +261,11 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
         double Pa = vd.getProp<Pressure>(a);
         double drho = 0;
         double pressureKoefficient = 0.0;
-        
+
         double term_1_sca = 0.0;
         double term_2_sca = 0.0;
         double kernel = 0.0;
+        double density_pred = 0.0;
 
         if (vd.getProp<type>(a) == FLUID)
         {
@@ -297,7 +297,6 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
-                    
                     drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                     term_1_vec += massb * DW;
                     term_2_sca += massa * massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
@@ -308,11 +307,10 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
 
             pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * (term_1_sca + term_2_sca));
-            vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + drho * dt;
-
-            density_pred_error = vd.getProp<rho>(a) - rho_zero   ;
-            rho_e = std::abs((density_pred_error) / rho_zero)    ;
-            rho_e_max = std::max(rho_e_max, rho_e)      ;
+            density_pred = vd.getProp<rho>(a) + drho * dt;
+            density_pred_error = density_pred - rho_zero;
+            rho_e = std::abs((density_pred_error) / rho_zero);
+            rho_e_max = std::max(rho_e_max, rho_e);
 
             vd.getProp<Pressure>(a) += pressureKoefficient * density_pred_error;
         }
@@ -504,15 +502,14 @@ void verlet_int(particles &vd, double dt)
         // if the particle is boundary
         if (vd.template getProp<type>(a) == BOUNDARY)
         {
-            // Update rho
-            double rhop = vd.template getProp<rho>(a);
+
             // Update only the density
             vd.template getProp<velocity>(a)[0] = 0.0;
             vd.template getProp<velocity>(a)[1] = 0.0;
             vd.template getProp<velocity>(a)[2] = 0.0;
             // double rhonew = vd.template getProp<rho_prev>(a) + dt2*vd.template getProp<drho>(a);
             // vd.template getProp<rho>(a) = (rhonew < rho_zero)?rho_zero:rhonew;
-            vd.template getProp<rho_prev>(a) = rhop;
+            vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);;
             ++part;
             continue;
         }
@@ -640,7 +637,7 @@ void peng_int(particles &vd, double dt)
         {
             // double rhop = vd.template getProp<rho>(a);
             //  Update only the density
-
+            vd.template getProp<velocity>(a)[0] = 0.0;
             vd.template getProp<velocity>(a)[1] = 0.0;
             vd.template getProp<velocity>(a)[2] = 0.0;
             ++part;
@@ -657,7 +654,9 @@ void peng_int(particles &vd, double dt)
         vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt05;
         vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt05;
 
-        double rho_candidate = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
+        //  TODO reached timestep is going to be wrong because of drho,
+        //  proper handling needs to be assured
+        double rho_candidate = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
         // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
@@ -679,7 +678,7 @@ void peng_int(particles &vd, double dt)
         vd.template getProp<x_pre>(a)[2] = vd.getPos(a)[2];
 
         vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
-        ;
+        
         ++part;
     }
     // remove the particles
@@ -773,7 +772,6 @@ void predict_v_and_x(particles &vd, CellList &NN, double dt)
         vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt05;
         vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt05;
         vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt05;
-
 
         ++part;
     }
