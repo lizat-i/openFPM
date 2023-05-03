@@ -11,6 +11,11 @@
 // initial spacing between particles dp in the formulas
 double eps = std::numeric_limits<double>::epsilon();
 
+#define LOGFunction(x) std::cout << x << '\n'
+#define LOGEnter(x, y) std::cout << " Entering function " << x << " from processor " << y << "\n"
+#define LOGExit(x, y) std::cout << " Exiting function " << x << " from processor " << y << "\n"
+#define LOGDouble(x, y) std::cout << " " << x << " " << y << "\n"
+
 const double dp = 0.0085;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
@@ -253,22 +258,20 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
         Point<3, double> xa = vd.getPos(a);
         Point<3, double> va = vd.getProp<velocity>(a);
-        Point<3, double> term_1_vec;
+        Point<3, double> term_1_vec = {0, 0, 0};
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
-        double Va = (massa / rhoa);
-        double Pa = vd.getProp<Pressure>(a);
-        double drho = 0;
-        double pressureKoefficient = 0.0;
-
-        double term_1_sca = 0.0;
-        double term_2_sca = 0.0;
-        double kernel = 0.0;
-        double density_pred = 0.0;
 
         if (vd.getProp<type>(a) == FLUID)
         {
+            double drho = 0;
+            double pressureKoefficient = 0.0;
+            double term_1_sca = 0.0;
+            double term_2_sca = 0.0;
+            double kernel = 0.0;
+            double density_pred = 0.0;
+
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
             while (Np.isNext() == true)
             {
@@ -284,9 +287,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                 Point<3, double> dr = xa - xb;
 
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
-                double Pb = vd.getProp<Pressure>(b);
                 double rhob = vd.getProp<rho>(b);
-                double Vb = (massa / rhoa);
                 double r2 = norm2(dr);
 
                 if (r2 < 4.0 * H * H)
@@ -295,18 +296,18 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     Point<3, double> DW;
                     double r = sqrt(r2);
 
-                    Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
                     drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
-                    term_1_vec += massb * DW;
-                    term_2_sca += massa * massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    term_1_vec += massa * DW;
+                    //TODO hier nur einmall masse und pcisph funktioniert
+                    term_2_sca += massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
 
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
-
-            pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * (term_1_sca + term_2_sca));
+            double beta = term_1_sca + term_2_sca;
+            pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * beta);
             density_pred = vd.getProp<rho>(a) + drho * dt;
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
@@ -371,7 +372,7 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
-                    double factor = (-1)*(Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
+                    double factor = (-1) * (Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
 
                     p_force_x += factor * DW.get(0);
                     p_force_y += factor * DW.get(1);
@@ -434,7 +435,7 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
                     kernel += wab;
                     rho_wab += rhob * wab;
                     p_wab += pressure_b * wab;
-                    g_wab += (wab * rhob * 0 * dr.get(0) + wab * rhob * 0 * dr.get(1) + wab * rhob * (-9.81) * dr.get(2));
+                    g_wab += (wab * rhob * bodyforce[0] * dr.get(0) + wab * rhob * bodyforce[1] * dr.get(1) + wab * rhob * bodyforce[2] * dr.get(2));
                 }
                 ++Np;
             }
@@ -509,7 +510,8 @@ void verlet_int(particles &vd, double dt)
             vd.template getProp<velocity>(a)[2] = 0.0;
             // double rhonew = vd.template getProp<rho_prev>(a) + dt2*vd.template getProp<drho>(a);
             // vd.template getProp<rho>(a) = (rhonew < rho_zero)?rho_zero:rhonew;
-            vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);;
+            vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
+            ;
             ++part;
             continue;
         }
@@ -678,7 +680,7 @@ void peng_int(particles &vd, double dt)
         vd.template getProp<x_pre>(a)[2] = vd.getPos(a)[2];
 
         vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
-        
+
         ++part;
     }
     // remove the particles
