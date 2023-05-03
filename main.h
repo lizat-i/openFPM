@@ -86,17 +86,19 @@ const int force_p = 11;
 // Type of the vector containing particles
 const double bodyforce[3] = {0.0, 0.0, -9.81};
 
-
 const double H_FLUID_MAX = 0.3;
 
 const double V_0 = 0.0;
 
 // max possible velocity
-const double u_init_max =std::sqrt((V_0+2*bodyforce[3]*H_FLUID_MAX));
+const double u_init_max = std::sqrt((V_0 + 2 * 9.81 * H_FLUID_MAX));
 // Maximum T
-const double DtMax = 0.25*(H/u_init_max);
+const double DtMax = 0.25 * (H / u_init_max);
 // Intitial Time
-const double DtInit = 0.05*(H/u_init_max);
+const double DtInit = 0.05 * (H / u_init_max);
+
+// maxPressureError
+const double errorMax = 0.01;
 
 #define LOG(x) std::cout << x << '\n'
 
@@ -253,7 +255,7 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
     }
 }
 template <typename CellList>
-inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc, double &rho_e_max,double &rho_e_mean, double &dt)
+inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc, double &rho_e_max, double &rho_e_mean, double &dt)
 {
     auto part = vd.getDomainIterator();
 
@@ -308,7 +310,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     DWab(dr, DW, r, false);
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                     term_1_vec += DW;
-                    //TODO hier nur einmall masse und pcisph funktioniert
+                    // TODO hier nur einmall masse und pcisph funktioniert
                     term_2_sca += (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
@@ -316,15 +318,18 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
             double beta = term_1_sca + term_2_sca;
-            pressureKoefficient = (rho_zero * rho_zero) / (massa*dt * dt * beta);
+            pressureKoefficient = (rho_zero * rho_zero) / (massa * dt * dt * beta);
             density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+            // TODO  check density
+            //       check which quantities are necesary
+            // vd.getProp<rho>(a)  = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
-            rho_e_mean +=rho_e  ;
+            rho_e_mean += rho_e;
             rho_e_max = std::max(rho_e_max, rho_e);
 
-            double candidatePressure = vd.getProp<Pressure>(a)  + pressureKoefficient * density_pred_error  ;
-            vd.getProp<Pressure>(a) = (candidatePressure > 0) ? candidatePressure : 0                  ;
+            double candidatePressure = vd.getProp<Pressure>(a) + pressureKoefficient * density_pred_error;
+            vd.getProp<Pressure>(a) = (candidatePressure > 0) ? candidatePressure : 0;
         }
 
         ++part;
@@ -481,21 +486,40 @@ void max_acceleration_and_velocity(particles &vd, double &max_acc, double &max_v
     v_cl.max(max_vel);
     v_cl.execute();
 }
-double calc_deltaT(particles &vd, double ViscDtMax, const double &rho_e_max, const double &rho_e_mean)
+double calc_deltaT(particles &vd, double ViscDtMax, const double &rho_e_max, const double &rho_e_mean, double &dt)
 {
     double Maxacc = 0.0;
     double Maxvel = 0.0;
     max_acceleration_and_velocity(vd, Maxacc, Maxvel);
 
-    
-    //-dt1 depends on force per unit mass.
-    const double dt_f = (Maxacc) ? sqrt(H / Maxacc) : std::numeric_limits<int>::max();
+    // conditions for increase
+    const double inc1 = (Maxacc)        ? 0.19 * sqrt(H / Maxacc)   : std::numeric_limits<int>::min();
+    const double inc2 = (Maxvel)        ? 0.19 * (H / Maxvel)       : std::numeric_limits<int>::min();
+    const double inc3 = (rho_e_max)     ? 0.45 * errorMax           : std::numeric_limits<int>::min();
+    const double inc4 = (rho_e_mean)    ? 0.09 * errorMax           : std::numeric_limits<int>::min();
+
+    // conditions for increase
+    const double dec1 = (Maxacc)        ? 0.2 * sqrt(H / Maxacc)    : std::numeric_limits<int>::max();
+    const double dec2 = (Maxvel)        ? 0.2 * (H / Maxvel)        : std::numeric_limits<int>::max();
+    const double dec3 = (rho_e_max)     ? 0.5 * errorMax            : std::numeric_limits<int>::max();
+    const double dec4 = (rho_e_mean)    ? 0.1 * errorMax            : std::numeric_limits<int>::max();
+
+    if (dt<inc1 && dt<inc2 && rho_e_max<inc3 && rho_e_mean<inc4){
+        dt = dt*1.002;
+        std::cout<<"increased dt"<<"\n"; 
+    };
+        
+    if (dt>dec1 && dt>dec2 && rho_e_max>dec3 && rho_e_mean>dec4){
+        dt = dt*0.998; 
+        std::cout<<"decreased dt"<<"\n";
+    };
+
+    dt = (dt > DtMax) ? DtMax : dt;
     //-dt2 combines the Courant and the viscous time-step controls.
-    const double dt_cv = H / (std::max(cbar, Maxvel * 10.) + H * ViscDtMax);
+    // const double dt_cv = H / (std::max(cbar, Maxvel * 10.) + H * ViscDtMax);
     //-dt new value of time step.
-    double dt = double(CFLnumber) * std::min(dt_f, dt_cv);
-    if (dt > double(DtMax))
-        dt = double(DtMax);
+    // double dt = double(CFLnumber) * std::min(dt_f, dt_cv);
+
     return dt;
 }
 openfpm::vector<size_t> to_remove;

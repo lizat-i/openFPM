@@ -125,7 +125,6 @@ int main(int argc, char *argv[])
     double t = 0.0;
 
     double dt = DtInit;
-
     while (t <= t_end)
     {
         Vcluster<> &v_cl = create_vcluster();
@@ -153,11 +152,11 @@ int main(int argc, char *argv[])
         double rho_e_max = 0.00;
         double rho_e_mean = 0.00;
 
-        double compressibility = 0.01;
+ 
 
         calc_forces_and_drho(vd, NN, max_visc);
 
-        while (pressureIteration < pressureIteration_min || rho_e_max > compressibility)
+        while (pressureIteration < pressureIteration_min || rho_e_max > errorMax)
         {
             rho_e_max = 0.0;
             rho_e_mean = 0.0;
@@ -173,14 +172,19 @@ int main(int argc, char *argv[])
             calc_PressureForces(vd, NN, max_visc);
 
             v_cl.max(rho_e_max);
+            v_cl.sum(rho_e_mean);
             v_cl.execute();
+            rho_e_mean = rho_e_mean / NrOfFluidParticles;
 
-            if (rho_e_max > 0.01 && v_cl.getProcessUnitID() == 0)
+            if (rho_e_max > errorMax && v_cl.getProcessUnitID() == 0)
             {
                 LOGdouble("pressureIteration : ", pressureIteration);
-                LOGdouble("error max : ", rho_e_max);
+                LOGdouble("error max : ", rho_e_max )               ; 
+                LOGdouble("rho_e_mean : ", rho_e_mean)              ;
+                LOGdouble("dt : ", dt)              ;
             }
-            rho_e_mean = rho_e_mean / NrOfFluidParticles;
+
+
             ++pressureIteration;
         }
 
@@ -188,8 +192,7 @@ int main(int argc, char *argv[])
         v_cl.max(max_visc);
         v_cl.execute();
         // Calculate delta t integration
-        //dt = calc_deltaT(vd, max_visc, rho_e_max, rho_e_mean);
-        dt = DtInit;
+        dt = calc_deltaT(vd, max_visc, rho_e_max, rho_e_mean,dt);
         // VerletStep or euler step
         /*
         it++;
