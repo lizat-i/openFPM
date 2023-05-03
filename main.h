@@ -265,12 +265,12 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
         if (vd.getProp<type>(a) == FLUID)
         {
-            double drho = 0;
             double pressureKoefficient = 0.0;
             double term_1_sca = 0.0;
             double term_2_sca = 0.0;
             double kernel = 0.0;
             double density_pred = 0.0;
+            vd.getProp<drho>(a) = 0.0;
 
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
             while (Np.isNext() == true)
@@ -297,7 +297,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     double r = sqrt(r2);
 
                     DWab(dr, DW, r, false);
-                    drho += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
+                    vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
                     term_1_vec += massa * DW;
                     //TODO hier nur einmall masse und pcisph funktioniert
                     term_2_sca += massb * (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
@@ -308,7 +308,10 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
             double beta = term_1_sca + term_2_sca;
             pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * beta);
-            density_pred = vd.getProp<rho>(a) + drho * dt;
+            //TODO add comparisson using vd.getProp<rho_pred>(a) and assigning to real rho
+            //  this would meand that the real densities are used for the calculations
+            
+            density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_max = std::max(rho_e_max, rho_e);

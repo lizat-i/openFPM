@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
         // Calculate pressure from the density
 
         double max_visc = 0.0;
-        vd.ghost_get<type, rho, Pressure, velocity,velocity_prev,x_pre>();
+        vd.ghost_get<type, rho, rho_prev,vicous_force,drho,Pressure, velocity,force_p,v_pre,x_pre>();
         // Calc forces
         size_t pressureIteration = 0.0 ;
         size_t pressureIteration_min = 3.0;
@@ -153,15 +153,19 @@ int main(int argc, char *argv[])
             rho_e_max = 0.0;
 
             predict_v_and_x(vd, NN, dt);
-            //vd.ghost_get<type, rho, Pressure, velocity,velocity_prev,x_pre>();
+            //vd.ghost_get<type, rho, rho_prev,vicous_force,drho,Pressure, velocity,force_p,v_pre,x_pre>();
             //vd.map();
             EqState_incompressible(vd, NN, max_visc, rho_e_max, dt);
             extrapolate_Boundaries(vd, NN, max_visc);
             calc_PressureForces(vd, NN, max_visc);
 
+            v_cl.max(rho_e_max);
+            v_cl.execute();
+
+            if (rho_e_max>0.01){
             LOGdouble("pressureIteration : ",pressureIteration)   ;
             LOGdouble("error max : ",rho_e_max)                   ;
- 
+            }
             ++pressureIteration;
         }
 
