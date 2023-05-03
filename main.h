@@ -327,7 +327,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             // TODO  check density
             //       check which quantities are necesary
-            vd.getProp<rho>(a)  = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+            //vd.getProp<rho>(a)  = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_mean += rho_e;
