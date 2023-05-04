@@ -315,8 +315,8 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     // beta term
 
-                    term_1_vec +=  DW;
-                    term_2_sca +=  (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    term_1_vec += massa* DW;
+                    term_2_sca += massa*massb (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
@@ -324,19 +324,15 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
 
             double beta = term_1_sca + term_2_sca;
-            pressureKoefficient = (rho_zero * rho_zero) / (massa*dt * dt * beta);
-            density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
-            // TODO  xck density
-            //       check which quantities are necesary
-            vd.getProp<rho>(a) = density_pred;
-            density_pred_error = density_pred - rho_zero;
+            pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * beta);
+            
+            vd.getProp<rho>(a) = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+            density_pred_error = vd.getProp<rho>(a) - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_mean += rho_e;
             rho_e_max = std::max(rho_e_max, rho_e);
 
-            double candidatePressure = vd.getProp<Pressure>(a) + pressureKoefficient * density_pred_error;
- 
-            vd.getProp<Pressure>(a) = candidatePressure;
+            vd.getProp<Pressure>(a) = vd.getProp<Pressure>(a) + pressureKoefficient * density_pred_error;;
         }
 
         ++part;
