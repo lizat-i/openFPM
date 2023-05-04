@@ -199,7 +199,7 @@ inline void calc_viscous_forces(particles &vd, CellList &NN, double &max_visc)
         vd.template getProp<force_p>(a)[0] = 0.0;
         vd.template getProp<force_p>(a)[1] = 0.0;
         vd.template getProp<force_p>(a)[2] = 0.0;
-        //TODO Not zeroing pressure 
+        // TODO Not zeroing pressure
         vd.template getProp<Pressure>(a) = 0.0;
 
         double v_force_x = 0.0;
@@ -314,9 +314,9 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
 
                     // beta term
- 
-                    term_1_vec += massb*DW;                   
-                    term_2_sca += massa*massb*(DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+
+                    term_1_vec +=  DW;
+                    term_2_sca +=  (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
@@ -324,19 +324,19 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
 
             double beta = term_1_sca + term_2_sca;
-            pressureKoefficient = (rho_zero * rho_zero) / (dt * dt * beta);
+            pressureKoefficient = (rho_zero * rho_zero) / (massa*dt * dt * beta);
             density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             // TODO  xck density
             //       check which quantities are necesary
-            vd.getProp<rho>(a)  = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+            vd.getProp<rho>(a) = density_pred;
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_mean += rho_e;
             rho_e_max = std::max(rho_e_max, rho_e);
 
             double candidatePressure = vd.getProp<Pressure>(a) + pressureKoefficient * density_pred_error;
-            //vd.getProp<Pressure>(a) = (candidatePressure > 0) ? candidatePressure : 0;
-            vd.getProp<Pressure>(a) =candidatePressure;
+ 
+            vd.getProp<Pressure>(a) = candidatePressure;
         }
 
         ++part;
@@ -353,14 +353,16 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
         // ... a
         auto a = part.get();
 
-        //Point<3, double> xa = vd.getPos(a);
-        //Point<3, double> va = vd.getProp<velocity>(a);
+        // Point<3, double> xa = vd.getPos(a);
+        // Point<3, double> va = vd.getProp<velocity>(a);
+        // double rhoa = vd.getProp<rho>(a);
 
         Point<3, double> xa = vd.getProp<x_pre>(a);
         Point<3, double> va = vd.getProp<velocity_prev>(a);
+        double rhoa = vd.getProp<rho_prev>(a);
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
-        double rhoa = vd.getProp<rho_prev>(a);
+
         double Va = (massa / rhoa);
         double Pa = vd.getProp<Pressure>(a);
 
@@ -373,12 +375,16 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
             while (Np.isNext() == true)
             {
+                // calculating Pressure force with preceeding 
                 auto b = Np.get();
+                
                 Point<3, double> xb = vd.getProp<x_pre>(b);
                 Point<3, double> vb = vd.getProp<velocity_prev>(b);
+                double rhob = vd.getProp<rho_prev>(b);
 
                 // Point<3, double> xb = vd.getPos(b);
                 // Point<3, double> vb = vd.getProp<velocity>(b);
+                // double rhob = vd.getProp<rho>(b);
 
                 if (a.getKey() == b)
                 {
@@ -390,7 +396,7 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
 
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
                 double Pb = vd.getProp<Pressure>(b);
-                double rhob = vd.getProp<rho_prev>(b);
+
                 double Vb = (massa / rhoa);
                 double r2 = norm2(dr);
 
@@ -403,20 +409,20 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
 
-                    //TODO pressure force 
-                    //adami & HAHN pressure force formulation
+                    // TODO pressure force
+                    // adami & HAHN pressure force formulation
                     double factor = (-1) * (Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhoa);
-                    //adami & HAHN pressure peng formulation
-                   // double factor = - massb * (+ (Pa/(rhoa*rhoa)  + Pb / (rhob*rhob)) );
+                    // adami & HAHN pressure peng formulation
+                    // double factor = - massb * (+ (Pa/(rhoa*rhoa)  + Pb / (rhob*rhob)) );
                     p_force_x += factor * DW.get(0);
                     p_force_y += factor * DW.get(1);
                     p_force_z += factor * DW.get(2);
                 }
                 ++Np;
             }
-            vd.getProp<force_p>(a)[0] = p_force_x/ massa;
-            vd.getProp<force_p>(a)[1] = p_force_y/ massa;
-            vd.getProp<force_p>(a)[2] = p_force_z/ massa;
+            vd.getProp<force_p>(a)[0] = p_force_x / massa;
+            vd.getProp<force_p>(a)[1] = p_force_y / massa;
+            vd.getProp<force_p>(a)[2] = p_force_z / massa;
         }
         ++part;
     }
@@ -433,10 +439,10 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
     while (part.isNext())
     {
         auto a = part.get();
-        Point<3, double> xa = vd.getPos(a);         
+        Point<3, double> xa = vd.getPos(a);
         Point<3, double> va = vd.getProp<velocity>(a);
-        //Point<3, double> xa = vd.getProp<x_pre>(a);
-        //Point<3, double> va = vd.getProp<velocity_prev>(a);
+        // Point<3, double> xa = vd.getProp<x_pre>(a);
+        // Point<3, double> va = vd.getProp<velocity_prev>(a);
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
@@ -455,14 +461,14 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
             {
                 auto b = Np.get();
                 // Point<3, double> xb = vd.getPos(b);
-                // Point<3, double> dr = xa - xb;                
-                
+                // Point<3, double> dr = xa - xb;
+
                 Point<3, double> xb = vd.getProp<x_pre>(b);
                 Point<3, double> vb = vd.getProp<velocity_prev>(b);
 
                 double pressure_b = vd.getProp<Pressure>(b);
 
-                //if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
+                // if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
                 if (vd.getProp<type>(b) != FLUID)
                 {
                     ++Np;
@@ -473,7 +479,7 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
                 Point<3, double> dr = xa - xb;
 
                 // interpolation with own particle
-                double r2 = norm2(dr)+std::numeric_limits<double>::min();
+                double r2 = norm2(dr) + std::numeric_limits<double>::min();
 
                 if (r2 < 4.0 * H * H)
                 {
@@ -485,11 +491,11 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
                 }
                 ++Np;
             }
-            vd.getProp<rho>(a) =        rho_wab / kernel            ;
-            vd.getProp<Pressure>(a) = (p_wab + g_wab) / kernel      ;
+            vd.getProp<rho>(a) = rho_wab / kernel;
+            vd.getProp<Pressure>(a) = (p_wab + g_wab) / kernel;
 
-            //vd.getProp<rho>(a) = (rho_wab / kernel > rho_zero) ? rho_wab / kernel : rho_zero;
-            //vd.getProp<Pressure>(a) = ((p_wab + g_wab) / kernel > 0) ? (p_wab + g_wab) / kernel : 0.0;
+            // vd.getProp<rho>(a) = (rho_wab / kernel > rho_zero) ? rho_wab / kernel : rho_zero;
+            // vd.getProp<Pressure>(a) = ((p_wab + g_wab) / kernel > 0) ? (p_wab + g_wab) / kernel : 0.0;
         }
         ++part;
     }
@@ -526,25 +532,29 @@ double calc_deltaT(particles &vd, double ViscDtMax, const double &rho_e_max, con
     max_acceleration_and_velocity(vd, Maxacc, Maxvel);
 
     // conditions for increase
-    const double inc1 = (Maxacc)        ? 0.19 * sqrt(H / Maxacc)   : std::numeric_limits<double>::min();
-    const double inc2 = (Maxvel)        ? 0.19 * (H / Maxvel)       : std::numeric_limits<double>::min();
-    const double inc3 = (rho_e_max)     ? 0.45 * errorMax           : std::numeric_limits<double>::min();
-    const double inc4 = (rho_e_mean)    ? 0.09 * errorMax           : std::numeric_limits<double>::min();
+    const double inc1 = (Maxacc) ? 0.19 * sqrt(H / Maxacc) : std::numeric_limits<double>::min();
+    const double inc2 = (Maxvel) ? 0.19 * (H / Maxvel) : std::numeric_limits<double>::min();
+    const double inc3 = (rho_e_max) ? 0.45 * errorMax : std::numeric_limits<double>::min();
+    const double inc4 = (rho_e_mean) ? 0.09 * errorMax : std::numeric_limits<double>::min();
 
     // conditions for increase
-    const double dec1 = (Maxacc)        ? 0.2 * sqrt(H / Maxacc)    : std::numeric_limits<double>::max();
-    const double dec2 = (Maxvel)        ? 0.2 * (H / Maxvel)        : std::numeric_limits<double>::max();
-    const double dec3 = (rho_e_max)     ? 0.5 * errorMax            : std::numeric_limits<double>::max();
-    const double dec4 = (rho_e_mean)    ? 0.1 * errorMax            : std::numeric_limits<double>::max();
+    const double dec1 = (Maxacc) ? 0.2 * sqrt(H / Maxacc) : std::numeric_limits<double>::max();
+    const double dec2 = (Maxvel) ? 0.2 * (H / Maxvel) : std::numeric_limits<double>::max();
+    const double dec3 = (rho_e_max) ? 0.5 * errorMax : std::numeric_limits<double>::max();
+    const double dec4 = (rho_e_mean) ? 0.1 * errorMax : std::numeric_limits<double>::max();
 
-    if (dt<inc1 && dt<inc2 && rho_e_max<inc3 && rho_e_mean<inc4){
-        dt = dt*1.002;
-        std::cout<<"increased dt"<<"\n"; 
+    if (dt < inc1 && dt < inc2 && rho_e_max < inc3 && rho_e_mean < inc4)
+    {
+        dt = dt * 1.002;
+        std::cout << "increased dt"
+                  << "\n";
     };
-        
-    if (dt>dec1 && dt>dec2 && rho_e_max>dec3 && rho_e_mean>dec4){
-        dt = dt*0.998; 
-        std::cout<<"decreased dt"<<"\n";
+
+    if (dt > dec1 && dt > dec2 && rho_e_max > dec3 && rho_e_mean > dec4)
+    {
+        dt = dt * 0.998;
+        std::cout << "decreased dt"
+                  << "\n";
     };
 
     dt = (dt > DtMax) ? DtMax : dt;
@@ -586,12 +596,12 @@ void peng_int(particles &vd, double dt)
         vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt05;
         vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt05;
         vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt05;
-        
-        //TODO unclipped density
+
+        // TODO unclipped density
         double rho_candidate = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
-        //vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
+        // vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
         vd.template getProp<rho>(a) = rho_candidate;
-        
+
         // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
         // Check if the particle go out of range in space and in density

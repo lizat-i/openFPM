@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     size_t it_reb = 0;
     double t = 0.0;
 
-    double dt = DtInit;
+    double dt = DtInit*10;
     while (t <= t_end)
     {
         Vcluster<> &v_cl = create_vcluster();
