@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
             sensor_pressure(vd, NN, press_t, probes);
             vd.write_frame("output/Geometry", write);
             it_reb = 0;
-            // write++;
+            write++;
 
             if (v_cl.getProcessUnitID() == 0)
             {

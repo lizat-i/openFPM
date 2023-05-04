@@ -199,7 +199,8 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
         vd.template getProp<force_p>(a)[0] = 0.0;
         vd.template getProp<force_p>(a)[1] = 0.0;
         vd.template getProp<force_p>(a)[2] = 0.0;
-        vd.template getProp<Pressure>(a) = 0.0;
+        //TODO Not zeroing pressure 
+        //vd.template getProp<Pressure>(a) = 0.0;
 
         double v_force_x = 0.0;
         double v_force_y = 0.0;
@@ -323,7 +324,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
 
             double beta = term_1_sca + term_2_sca;
-            pressureKoefficient = (rho_zero * rho_zero) / (massa*massa * dt * dt * beta);
+            pressureKoefficient = (rho_zero * rho_zero) / (massa*massa*dt * dt * beta);
             density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
             // TODO  check density
             //       check which quantities are necesary
@@ -394,9 +395,10 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
 
-                    //TODO pressure force
+                    //TODO pressure force 
                     //adami & HAHN pressure force formulation
                     //double factor = (-1) * (Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
+                    //adami & HAHN pressure peng formulation
                     double factor = - massb * (+ (Pa/(rhoa*rhoa)  + Pb / (rhob*rhob)) );
                     p_force_x += factor * DW.get(0);
                     p_force_y += factor * DW.get(1);
@@ -404,9 +406,9 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
                 }
                 ++Np;
             }
-            vd.getProp<force_p>(a)[0] = p_force_x / massa;
-            vd.getProp<force_p>(a)[1] = p_force_y / massa;
-            vd.getProp<force_p>(a)[2] = p_force_z / massa;
+            vd.getProp<force_p>(a)[0] = p_force_x;// / massa;
+            vd.getProp<force_p>(a)[1] = p_force_y;// / massa;
+            vd.getProp<force_p>(a)[2] = p_force_z;// / massa;
         }
         ++part;
     }
