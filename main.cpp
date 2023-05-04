@@ -152,8 +152,6 @@ int main(int argc, char *argv[])
         double rho_e_max = 0.00;
         double rho_e_mean = 0.00;
 
- 
-
         calc_viscous_forces(vd, NN, max_visc);
 
         while (pressureIteration < pressureIteration_min || rho_e_max > errorMax)
@@ -165,8 +163,8 @@ int main(int argc, char *argv[])
             // TODO  Domain sync
             //       check which quantities are necesary
 
-            //vd.ghost_get<type, rho, rho_prev, vicous_force, drho, Pressure, velocity, force_p, v_pre, x_pre>();
-            //vd.map();
+            vd.ghost_get<type, rho, rho_prev, vicous_force, drho, Pressure, velocity, force_p, v_pre, x_pre>();
+            vd.map();
             EqState_incompressible(vd, NN, max_visc, rho_e_max, rho_e_mean, dt);
             extrapolate_Boundaries(vd, NN, max_visc);
             calc_PressureForces(vd, NN, max_visc);
@@ -185,6 +183,7 @@ int main(int argc, char *argv[])
             }
 
 
+            
             ++pressureIteration;
         }
 

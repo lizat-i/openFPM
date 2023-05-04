@@ -200,7 +200,7 @@ inline void calc_viscous_forces(particles &vd, CellList &NN, double &max_visc)
         vd.template getProp<force_p>(a)[1] = 0.0;
         vd.template getProp<force_p>(a)[2] = 0.0;
         // TODO Not zeroing pressure
-        vd.template getProp<Pressure>(a) = 0.0;
+        //vd.template getProp<Pressure>(a) = 0.0;
 
         double v_force_x = 0.0;
         double v_force_y = 0.0;
@@ -316,7 +316,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     // beta term
 
                     term_1_vec += massa* DW;
-                    term_2_sca += massa*massb (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    term_2_sca += massa*massa*(DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
@@ -332,7 +332,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             rho_e_mean += rho_e;
             rho_e_max = std::max(rho_e_max, rho_e);
 
-            vd.getProp<Pressure>(a) = vd.getProp<Pressure>(a) + pressureKoefficient * density_pred_error;;
+            vd.getProp<Pressure>(a) +=  pressureKoefficient * density_pred_error;;
         }
 
         ++part;
@@ -349,13 +349,13 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
         // ... a
         auto a = part.get();
 
-        // Point<3, double> xa = vd.getPos(a);
-        // Point<3, double> va = vd.getProp<velocity>(a);
-        // double rhoa = vd.getProp<rho>(a);
-
-        Point<3, double> xa = vd.getProp<x_pre>(a);
-        Point<3, double> va = vd.getProp<velocity_prev>(a);
-        double rhoa = vd.getProp<rho_prev>(a);
+        Point<3, double> xa = vd.getPos(a);
+        Point<3, double> va = vd.getProp<velocity>(a);
+        double rhoa = vd.getProp<rho>(a);
+ 
+        //Point<3, double> xa = vd.getProp<x_pre>(a);
+        //Point<3, double> va = vd.getProp<velocity_prev>(a);
+        //double rhoa = vd.getProp<rho_prev>(a);
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
 
@@ -373,14 +373,14 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
             {
                 // calculating Pressure force with preceeding 
                 auto b = Np.get();
-                
-                Point<3, double> xb = vd.getProp<x_pre>(b);
-                Point<3, double> vb = vd.getProp<velocity_prev>(b);
-                double rhob = vd.getProp<rho_prev>(b);
+ 
+                //Point<3, double> xb = vd.getProp<x_pre>(b);
+                //Point<3, double> vb = vd.getProp<velocity_prev>(b);
+                //double rhob = vd.getProp<rho_prev>(b);
 
-                // Point<3, double> xb = vd.getPos(b);
-                // Point<3, double> vb = vd.getProp<velocity>(b);
-                // double rhob = vd.getProp<rho>(b);
+                Point<3, double> xb = vd.getPos(b);
+                Point<3, double> vb = vd.getProp<velocity>(b);
+                double rhob = vd.getProp<rho>(b);
 
                 if (a.getKey() == b)
                 {
