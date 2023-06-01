@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     Box<3, double> xmax({1.6 - dp / 2, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.45 + dp / 2});
     // ymin ymax plates
     Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0 + dp / 2, 0.00, 0.4 + dp / 2});
-    Box<3, double> ymax({0.0 - 3 * dp, 0.67 + dp / 2, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4 + dp / 2});
+    Box<3, double> ymax({0.0 - 3 * dp, 0.67 - dp / 2, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4 + dp / 2});
     // obstacle box
     Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2});
 
@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
 
         t += dt;
 
-        if (it%50 == 0)
+        if (it%10 == 0)
         {
 
             // sensor_pressure calculation require ghost and update cell-list

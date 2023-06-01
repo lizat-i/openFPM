@@ -53,7 +53,7 @@ const double rho_zero = 1000.0;
 // Constant used to define time integration
 const double CFLnumber = 0.2;
 // Minimum T
-const double DtMin = 0.00001;
+const double DtMin =  0.05* H /1.9 ;
 // Minimum Rho allowed
 const double RhoMin = 700.0;
 // Maximum Rho allowed
@@ -477,17 +477,23 @@ void max_acceleration_and_velocity(particles &vd, double &max_acc, double &max_v
 }
 double calc_deltaT(particles &vd, double ViscDtMax)
 {
-    double Maxacc = 0.0;
-    double Maxvel = 0.0;
-    max_acceleration_and_velocity(vd, Maxacc, Maxvel);
-    //-dt1 depends on force per unit mass.
-    const double dt_f = (Maxacc) ? sqrt(H / Maxacc) : std::numeric_limits<int>::max();
-    //-dt2 combines the Courant and the viscous time-step controls.
-    const double dt_cv = H / (std::max(cbar, Maxvel * 10.) + H * ViscDtMax);
-    //-dt new value of time step.
-    double dt = double(CFLnumber) * std::min(dt_f, dt_cv);
-    if (dt < double(DtMin))
-        dt = double(DtMin);
+    double Maxvel   = 1.9               ;
+    double dt       = (0.05* H /1.9) ;
+    
+    // double Maxacc = 0.0;
+    // double Maxvel = 0.0;
+    // max_acceleration_and_velocity(vd, Maxacc, Maxvel);
+    // //-dt1 depends on force per unit mass.
+    // const double dt_f = (Maxacc) ? sqrt(H / Maxacc) : std::numeric_limits<int>::max();
+    // //-dt2 combines the Courant and the viscous time-step controls.
+    // const double dt_cv = H / (std::max(cbar, Maxvel * 10.) + H * ViscDtMax);
+    // //-dt new value of time step.
+    // double dt = double(CFLnumber) * std::min(dt_f, dt_cv);
+    // if (dt < double(DtMin))
+    //     dt = double(DtMin);
+    // return dt;
+    // starting with constant timestep
+
     return dt;
 }
 openfpm::vector<size_t> to_remove;
