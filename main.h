@@ -191,6 +191,7 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
         vd.template getProp<force_p>(a)[0] = 0.0;
         vd.template getProp<force_p>(a)[1] = 0.0;
         vd.template getProp<force_p>(a)[2] = 0.0;
+
         vd.template getProp<Pressure>(a) = 0.0;
 
         double v_force_x = 0.0;
@@ -230,8 +231,8 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
                     Vb = (massb / rhob);
 
                     DWab(dr, DW, r, false);
-
-                    double factor = (visco*cbar*H*massa) * (v_rel.get(0) * dr.get(0) + v_rel.get(1) * dr.get(1) + v_rel.get(2) * dr.get(2)) / ( r + Eta2)         ;
+ 
+                    double factor = (visco*cbar*H*massa) * (v_rel.get(0) * dr.get(0) + v_rel.get(1) * dr.get(1) + v_rel.get(2) * dr.get(2)) / ( r + Eta2);
 //                  double factor = (viscosityaveraging) * (Vb * Vb + Va * Va) * (DW.get(0) * e_ab.get(0) + DW.get(1) * e_ab.get(1) + DW.get(2) * e_ab.get(2));
  
                     // v_force_x += factor * v_rel.get(0) / r;
@@ -280,6 +281,8 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             double term_2_sca = 0.0;
             double kernel = 0.0;
             double density_pred = 0.0;
+            double interpolatedPressure = 0.0;
+            
             vd.getProp<drho>(a) = 0.0;
 
             auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
@@ -307,25 +310,30 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     double r = sqrt(r2);
 
                     DWab(dr, DW, r, false);
-                    vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
+
+
+                    double factor = (visco*cbar*H*2*massb*(rhoa-rhob)) / ( rhob*(r + Eta2))*(DW.get(0) * dr.get(0) + DW.get(1) * dr.get(1) + DW.get(2) * dr.get(2)) ;
+                    vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2)) + factor;
 
                     //term_1_vec += massb/rhob * DW;
                     
-                    term_1_2_vec += (massb/rhob) * DW  ;
+                    term_1_2_vec += (massb) * DW  ;
                     term_1_1_vec += (massb)      * DW  ;
                     
                     //TODO hier nur einmall masse und pcisph funktioniert
 
-                    term_2_sca += massb/rhob*( DW.get(0) * DW.get(0) +  DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    term_2_sca += massa*massb*( DW.get(0) * DW.get(0) +  DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+                    interpolatedPressure += massb/rhob * vd.getProp<Pressure>(a) *Wab(r) ;
+ 
                 }
                 ++Np;
             };
 
             term_1_sca = term_1_1_vec.get(0) * term_1_2_vec.get(0) + term_1_1_vec.get(1) * term_1_2_vec.get(1) + term_1_1_vec.get(2) * term_1_2_vec.get(2);
 
-            double beta = term_1_sca + massa*term_2_sca;
+            double beta = term_1_sca + term_2_sca;
 
-            pressureKoefficient = (rhoa) / (dt * dt * beta);
+            pressureKoefficient = (rho_zero*rho_zero) / (dt * dt * beta);
 
  
             //  this would meand that the real densities are used for the calculations
@@ -339,16 +347,14 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_max = std::max(rho_e_max, rho_e);
 
-
-
-            double candidatePressure = vd.getProp<Pressure>(a)  + pressureKoefficient * density_pred_error  ;
+            double candidatePressure = vd.getProp<Pressure>(a) + pressureKoefficient * density_pred_error  ;
 
             //TODO No Pressure Clipping 
             //  this would meand that the real densities are used for the calculations
             
-            LOG(candidatePressure);
+            // LOG(candidatePressure);
 
-            vd.getProp<Pressure>(a) =  pressureSmoothing *vd.getProp<Pressure>(a) + (1-pressureSmoothing)*candidatePressure    ;
+            vd.getProp<Pressure>(a) =  candidatePressure *vd.getProp<Pressure>(a) + (1-pressureSmoothing)*interpolatedPressure    ;
         }
 
         ++part;
@@ -455,6 +461,7 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
             double rho_wab = 0;
             double p_wab = 0;
             double g_wab = 0;
+            Point<3, double> g_wab_vectorial = {0,0,0} ;
             // For each neighborhood particle
             while (Np.isNext() == true)
             {
@@ -478,10 +485,11 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
                     kernel += wab;
                     rho_wab += rhob * wab;
                     p_wab += pressure_b * wab;
-                    g_wab += (wab * rhob * bodyforce[0] * dr.get(0) + wab * rhob * bodyforce[1] * dr.get(1) + wab * rhob * bodyforce[2] * dr.get(2));
+                    g_wab_vectorial += wab * rhob *dr;
                 }
                 ++Np;
             }
+            g_wab = bodyforce[0]*g_wab_vectorial.get(0) + bodyforce[1]*g_wab_vectorial.get(1) + bodyforce[2]*g_wab_vectorial.get(2) ;
             vd.getProp<rho>(a) = (rho_wab / kernel > rho_zero) ? rho_wab / kernel : rho_zero;
             vd.getProp<Pressure>(a) = ((p_wab + g_wab) / kernel > 0) ? (p_wab + g_wab) / kernel : 0.0;
         }
