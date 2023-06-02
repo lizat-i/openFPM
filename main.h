@@ -16,6 +16,10 @@ double eps = std::numeric_limits<double>::epsilon();
 #define LOGExit(x, y) std::cout << " Exiting function " << x << " from processor " << y << "\n"
 #define LOGDouble(x, y) std::cout << " " << x << " " << y << "\n"
 
+
+
+const double pressureSmoothing = 0.5;
+
 const double dp = 0.0085;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
@@ -263,7 +267,8 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
         Point<3, double> xa = vd.getPos(a);
         Point<3, double> va = vd.getProp<velocity>(a);
-        Point<3, double> term_1_vec = {0, 0, 0};
+        Point<3, double> term_1_1_vec = {0, 0, 0};
+        Point<3, double> term_1_2_vec = {0, 0, 0};
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
@@ -303,32 +308,47 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
 
                     DWab(dr, DW, r, false);
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
-                    term_1_vec += DW;
+
+                    //term_1_vec += massb/rhob * DW;
+                    
+                    term_1_2_vec += (massb/rhob) * DW  ;
+                    term_1_1_vec += (massb)      * DW  ;
+                    
                     //TODO hier nur einmall masse und pcisph funktioniert
-                    term_2_sca += (DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
+
+                    term_2_sca += massb/rhob*( DW.get(0) * DW.get(0) +  DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
                 }
                 ++Np;
             };
 
-            term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
-            double beta = term_1_sca + term_2_sca;
-            pressureKoefficient = (rho_zero * rho_zero) / (massa*dt * dt * beta);
+            term_1_sca = term_1_1_vec.get(0) * term_1_2_vec.get(0) + term_1_1_vec.get(1) * term_1_2_vec.get(1) + term_1_1_vec.get(2) * term_1_2_vec.get(2);
 
-            //TODO add comparisson using vd.getProp<rho_pred>(a) and assigning to real rho
+            double beta = term_1_sca + massa*term_2_sca;
+
+            pressureKoefficient = (rhoa) / (dt * dt * beta);
+
+ 
             //  this would meand that the real densities are used for the calculations
             
             density_pred = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+
             // vd.getProp<rho>(a) = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+
+
             density_pred_error = density_pred - rho_zero;
             rho_e = std::abs((density_pred_error) / rho_zero);
             rho_e_max = std::max(rho_e_max, rho_e);
+
+
 
             double candidatePressure = vd.getProp<Pressure>(a)  + pressureKoefficient * density_pred_error  ;
 
             //TODO No Pressure Clipping 
             //  this would meand that the real densities are used for the calculations
+            
+            LOG(candidatePressure);
 
-            vd.getProp<Pressure>(a) =  candidatePressure    ;
+            vd.getProp<Pressure>(a) =  pressureSmoothing *vd.getProp<Pressure>(a) + (1-pressureSmoothing)*candidatePressure    ;
         }
 
         ++part;
@@ -789,6 +809,7 @@ void predict_v_and_x(particles &vd, CellList &NN, double dt)
     {
         // ... a
         auto a = part.get();
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         // if the particle is boundary
         if (vd.template getProp<type>(a) == BOUNDARY)
         {
@@ -796,9 +817,9 @@ void predict_v_and_x(particles &vd, CellList &NN, double dt)
             continue;
         }
 
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<vicous_force>(a)[0] + vd.template getProp<force_p>(a)[0] + bodyforce[0]) * dt;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] + bodyforce[1]) * dt;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<vicous_force>(a)[2] + vd.template getProp<force_p>(a)[2] + bodyforce[2]) * dt;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<vicous_force>(a)[0] + vd.template getProp<force_p>(a)[0] +  bodyforce[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] +  bodyforce[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<vicous_force>(a)[2] + vd.template getProp<force_p>(a)[2] +  bodyforce[2]) * dt;
 
         // vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt05;
         // vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt05;
