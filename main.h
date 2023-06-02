@@ -462,11 +462,13 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
             double p_wab = 0;
             double g_wab = 0;
             Point<3, double> g_wab_vectorial = {0,0,0} ;
+            Point<3, double> v_wab_vectorial = {0,0,0} ;
             // For each neighborhood particle
             while (Np.isNext() == true)
             {
                 auto b = Np.get();
                 Point<3, double> xb = vd.getPos(b);
+                Point<3, double> vb = vd.getProp<velocity>(b);
                 double pressure_b = vd.getProp<Pressure>(b);
 
                 if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
@@ -484,14 +486,19 @@ inline void extrapolate_Boundaries(particles &vd, CellList &NN, double &max_visc
                     double wab = Wab(sqrt(r2));
                     kernel += wab;
                     rho_wab += rhob * wab;
-                    p_wab += pressure_b * wab;
-                    g_wab_vectorial += wab * rhob *dr;
+                    p_wab += pressure_b * wab   ;
+                    g_wab_vectorial += wab * rhob *dr   ;
+                    v_wab_vectorial += wab *vb ;
                 }
                 ++Np;
             }
             g_wab = bodyforce[0]*g_wab_vectorial.get(0) + bodyforce[1]*g_wab_vectorial.get(1) + bodyforce[2]*g_wab_vectorial.get(2) ;
             vd.getProp<rho>(a) = (rho_wab / kernel > rho_zero) ? rho_wab / kernel : rho_zero;
             vd.getProp<Pressure>(a) = ((p_wab + g_wab) / kernel > 0) ? (p_wab + g_wab) / kernel : 0.0;
+
+            vd.template getProp<velocity>(a)[0] = - v_wab_vectorial.get(0) * 1/kernel    ;
+            vd.template getProp<velocity>(a)[1] = - v_wab_vectorial.get(1) * 1/kernel    ;
+            vd.template getProp<velocity>(a)[2] = - v_wab_vectorial.get(2) * 1/kernel    ;
         }
         ++part;
     }
