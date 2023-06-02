@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
             v_cl.max(rho_e_max);
             v_cl.execute();
 
-            if (rho_e_max>0.01){
+            if (rho_e_max>eps){
             LOGdouble("pressureIteration : ",pressureIteration)   ;
             LOGdouble("error max : ",rho_e_max)                   ;
             }

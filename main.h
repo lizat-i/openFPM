@@ -28,7 +28,7 @@ const double gamma_ = 7.0;
 // sqrt(3.0*dp*dp) support of the kernel
 const double H = 0.0147224318643;
 // Eta in the formulas
-const double Eta2 = 0.01 * H * H;
+const double Eta2 = 0.01  * H*H;
 // alpha in the formula
 const double visco = 0.1;
 // alpha in the formula
@@ -227,17 +227,22 @@ inline void calc_forces_and_drho(particles &vd, CellList &NN, double &max_visc)
 
                     DWab(dr, DW, r, false);
 
-                    double factor = (viscosityaveraging) * (Vb * Vb + Va * Va) * (DW.get(0) * e_ab.get(0) + DW.get(1) * e_ab.get(1) + DW.get(2) * e_ab.get(2));
+                    double factor = (visco*cbar*H*massa) * (v_rel.get(0) * dr.get(0) + v_rel.get(1) * dr.get(1) + v_rel.get(2) * dr.get(2)) / ( r + Eta2)         ;
+//                  double factor = (viscosityaveraging) * (Vb * Vb + Va * Va) * (DW.get(0) * e_ab.get(0) + DW.get(1) * e_ab.get(1) + DW.get(2) * e_ab.get(2));
+ 
+                    // v_force_x += factor * v_rel.get(0) / r;
+                    // v_force_y += factor * v_rel.get(1) / r;
+                    // v_force_z += factor * v_rel.get(2) / r;
 
-                    v_force_x += factor * v_rel.get(0) / r;
-                    v_force_y += factor * v_rel.get(1) / r;
-                    v_force_z += factor * v_rel.get(2) / r;
+                    v_force_x += factor * DW.get(0) ;
+                    v_force_y += factor * DW.get(1) ;
+                    v_force_z += factor * DW.get(2) ;
                 }
                 ++Np;
             }
-            vd.getProp<vicous_force>(a)[0] = v_force_x / massa * 0;
-            vd.getProp<vicous_force>(a)[1] = v_force_y / massa * 0;
-            vd.getProp<vicous_force>(a)[2] = v_force_z / massa * 0;
+            vd.getProp<vicous_force>(a)[0] = v_force_x;
+            vd.getProp<vicous_force>(a)[1] = v_force_y;
+            vd.getProp<vicous_force>(a)[2] = v_force_z;
         }
         ++part;
     }
@@ -308,6 +313,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             term_1_sca = term_1_vec.get(0) * term_1_vec.get(0) + term_1_vec.get(1) * term_1_vec.get(1) + term_1_vec.get(2) * term_1_vec.get(2);
             double beta = term_1_sca + term_2_sca;
             pressureKoefficient = (rho_zero * rho_zero) / (massa*dt * dt * beta);
+
             //TODO add comparisson using vd.getProp<rho_pred>(a) and assigning to real rho
             //  this would meand that the real densities are used for the calculations
             
@@ -381,7 +387,9 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
 
                     Vb = (massb / rhob);
                     DWab(dr, DW, r, false);
-                    double factor = (-1) * (Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
+
+                    // double factor = (-1) * (Vb * Vb + Va * Va) * (rhob * vd.getProp<Pressure>(a) + rhoa * vd.getProp<Pressure>(b)) / (rhob + rhob);
+                    double factor = (-1) * (massb) * (  vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob);
 
                     p_force_x += factor * DW.get(0);
                     p_force_y += factor * DW.get(1);
@@ -389,9 +397,15 @@ inline void calc_PressureForces(particles &vd, CellList &NN, double &max_visc)
                 }
                 ++Np;
             }
-            vd.getProp<force_p>(a)[0] = p_force_x / massa;
-            vd.getProp<force_p>(a)[1] = p_force_y / massa;
-            vd.getProp<force_p>(a)[2] = p_force_z / massa;
+
+            // vd.getProp<force_p>(a)[0] = p_force_x / massa;
+            // vd.getProp<force_p>(a)[1] = p_force_y / massa;
+            // vd.getProp<force_p>(a)[2] = p_force_z / massa;
+
+            vd.getProp<force_p>(a)[0] = p_force_x;  //* massa/rhoa;
+            vd.getProp<force_p>(a)[1] = p_force_y;  //* massa/rhoa;
+            vd.getProp<force_p>(a)[2] = p_force_z;  //* massa/rhoa;
+
         }
         ++part;
     }
