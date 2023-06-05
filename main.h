@@ -18,7 +18,7 @@ double eps = std::numeric_limits<double>::epsilon();
 
 
 
-const double pressureSmoothing = 0.5;
+const double pressureSmoothing = 0.8;
 
 const double dp = 0.0085;
 // Maximum height of the fluid water
@@ -323,7 +323,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
                     //TODO hier nur einmall masse und pcisph funktioniert
 
                     term_2_sca += massa*massb*( DW.get(0) * DW.get(0) +  DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2));
-                    interpolatedPressure += massb/rhob * vd.getProp<Pressure>(a) *Wab(r) ;
+                    interpolatedPressure += massb/rhob * vd.getProp<Pressure>(b) *Wab(r) ;
  
                 }
                 ++Np;
@@ -354,7 +354,7 @@ inline void EqState_incompressible(particles &vd, CellList &NN, double &max_visc
             
             // LOG(candidatePressure);
 
-            vd.getProp<Pressure>(a) =  candidatePressure *vd.getProp<Pressure>(a) + (1-pressureSmoothing)*interpolatedPressure    ;
+            vd.getProp<Pressure>(a) =  candidatePressure * pressureSmoothing + (1-pressureSmoothing)*interpolatedPressure    ;
         }
 
         ++part;
@@ -716,14 +716,17 @@ void peng_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<vicous_force>(a)[1] + vd.template getProp<force_p>(a)[1] + bodyforce[1]) * dt;
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<vicous_force>(a)[2] + vd.template getProp<force_p>(a)[2] + bodyforce[2]) * dt;
 
-        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity_prev>(a)[0] + vd.template getProp<velocity>(a)[0]) * dt05;
-        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity_prev>(a)[1] + vd.template getProp<velocity>(a)[1]) * dt05;
-        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt05;
+        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity>(a)[0]) * dt;
+        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity>(a)[1]) * dt;
+        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity>(a)[2]) * dt;
 
         //  TODO reached timestep is going to be wrong because of drho,
         //  proper handling needs to be assured
         double rho_candidate = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
-        vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
+        
+        vd.template getProp<rho>(a) =  rho_candidate; //(rho_candidate > rho_zero) ? rho_candidate : rho_zero;
+        
+        // vd.template getProp<rho>(a) = (rho_candidate > rho_zero) ? rho_candidate : rho_zero;
         // vd.template getProp<rho>(a) = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
 
         // Check if the particle go out of range in space and in density
