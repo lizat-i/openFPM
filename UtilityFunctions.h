@@ -5,9 +5,7 @@
 #include "inputs.h"
 #include "vanillaFunctions.h"
 
-
-
-inline particles InitializeDomain()
+particles InitializeDomain_vanillaSPH()
 {
     // It contain for each time-step the value detected by the probes
     openfpm::vector<openfpm::vector<double>> press_t;
@@ -26,15 +24,15 @@ inline particles InitializeDomain()
     // You can ignore all these dp/2.0 is a trick to reach the same initialization
     // of Dual-SPH that use a different criteria to draw particles
 
-    Box<3, double> fluid_box({dp / 2.0, dp / 2.0, dp / 2.0}, {0.4 + dp / 2.0, 0.67 - dp / 2.0, 0.3 + dp / 2.0});
+    Box<3, double> fluid_box({0, 0, 0}, {1, 1, 1});
     // return an iterator to the fluid particles to add to vd
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
     // here we fill some of the constants needed by the simulation
     max_fluid_height = fluid_it.getBoxMargins().getHigh(2);
     h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
-    
+
     B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
-    cbar = coeff_sound * sqrt(gravity * h_swl);
+    // cbar = coeff_sound * sqrt(gravity * h_swl);
     // for each particle inside the fluid box ...
     while (fluid_it.isNext())
     {
@@ -110,6 +108,94 @@ inline particles InitializeDomain()
         ++obstacle_box;
     }
 
+    return vd;
+}
 
+particles InitializeDomain_PoiseuilleFlow3d(){
+    // Initialize domain
+    Box<3, double> domain({0, -4*dp, 0}, {1, 1+4*dp, 1});
+    size_t sz[3] = {NumberOfParticles_x, NumberOfParticles_y, NumberOfParticles_z};
+    size_t bc[3] = {PERIODIC, NON_PERIODIC, PERIODIC};
+    Ghost<3, double> g(2 * H);
+    particles vd(0, domain, bc, g, DEC_GRAN(512));
+
+
+
+    Box<3, double> fluid_box({0, 0, 0}, {1, 1, 1});
+    auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
+
+    while (fluid_it.isNext())
+    {
+
+        vd.add();
+        vd.getLastPos()[0] = fluid_it.get().get(0);
+        vd.getLastPos()[1] = fluid_it.get().get(1);
+        vd.getLastPos()[2] = fluid_it.get().get(2);
+
+        vd.template getLastProp<type>() = FLUID;
+        vd.template getLastProp<Pressure>() = 0;
+
+        vd.template getLastProp<drho>() = 0;
+        vd.template getLastProp<rho>() = rho_zero;
+        vd.template getLastProp<rho_prev>() = rho_zero;
+
+        vd.template getLastProp<velocity>()[0] = 0.0;
+        vd.template getLastProp<velocity>()[1] = 0.0;
+        vd.template getLastProp<velocity>()[2] = 0.0;
+
+        vd.template getLastProp<force>()[0] = 0.0;
+        vd.template getLastProp<force>()[1] = 0.0;
+        vd.template getLastProp<force>()[2] = 0.0;
+
+        vd.template getLastProp<velocity_prev>()[0] = 0.0;
+        vd.template getLastProp<velocity_prev>()[1] = 0.0;
+        vd.template getLastProp<velocity_prev>()[2] = 0.0;
+        ++fluid_it;
+    }
+
+    // Recipient
+    Box<3, double> yminplate({0.0, 0.0 - 4 * dp, 0.0}, {1.0, 0.0, 1.0});
+    Box<3, double> ymaxplate({0.0, 1.0, 0.0}, {1.0, 1.0 + 4 * dp, 1.0});
+
+    openfpm::vector<Box<3, double>> BoundariesBoxes;
+    BoundariesBoxes.add(yminplate);
+    BoundariesBoxes.add(ymaxplate);
+
+    for (size_t i = 0; i < 2; ++i)
+    {
+        std::cout << "for box number " << i << '\n';
+        Box<3, double> box = BoundariesBoxes.get(i);
+        auto toFill = DrawParticles::DrawBox(vd, sz, domain, box);
+
+        while (toFill.isNext())
+        {
+
+            vd.add();
+            vd.getLastPos()[0] = toFill.get().get(0);
+            vd.getLastPos()[1] = toFill.get().get(1);
+            vd.getLastPos()[2] = toFill.get().get(2);
+
+            vd.template getLastProp<type>() = BOUNDARY;
+            vd.template getLastProp<Pressure>() = 0;
+
+            vd.template getLastProp<drho>() = 0;
+            vd.template getLastProp<rho>() = rho_zero;
+            vd.template getLastProp<rho_prev>() = rho_zero;
+
+            vd.template getLastProp<velocity>()[0] = 0.0;
+            vd.template getLastProp<velocity>()[1] = 0.0;
+            vd.template getLastProp<velocity>()[2] = 0.0;
+
+            vd.template getLastProp<force>()[0] = 0.0;
+            vd.template getLastProp<force>()[1] = 0.0;
+            vd.template getLastProp<force>()[2] = 0.0;
+
+            vd.template getLastProp<velocity_prev>()[0] = 0.0;
+            vd.template getLastProp<velocity_prev>()[1] = 0.0;
+            vd.template getLastProp<velocity_prev>()[2] = 0.0;
+            ++toFill;
+        }
+    }
+ 
     return vd;
 }
