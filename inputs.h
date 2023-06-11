@@ -9,6 +9,7 @@
 // initial spacing between particles dp in the formulas
 // const double dp = 0.04;
 const double dp = 0.0085;
+//const double dp = 0.02;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
 double h_swl = 0.0;
@@ -32,9 +33,9 @@ const double visco = 0.1;
 
 
 // // Mass of the fluid particles
-// const double MassFluid = 0.000614125;
+const double MassFluid_init = 0.000614125;
 // // Mass of the boundary particles
-// const double MassBound = 0.000614125;
+const double MassBound_init = 0.000614125;
 
 // Mass of the fluid particles
 const double initVolume = pow(dp,3);
@@ -42,6 +43,7 @@ const double initVolume = pow(dp,3);
 const double MassBound = rho_zero*initVolume;
 // Mass of the fluid particles
 const double MassFluid = rho_zero*initVolume;
+
  
 // End simulation time
 #ifdef TEST_RUN
@@ -50,14 +52,14 @@ const double t_end = 0.001;
 const double t_end = 1.5;
 #endif
 // Gravity acceleration
-const double gravity = 9.81;
+const double gravity = 640;
 
 // Filled later require h_swl, it is b in the formulas
 double B = 0.0;
 // Constant used to define time integration
 const double timesteppingConstant = 0.2;
 // Minimum T
-const double DtMin = 0.00001;
+const double DtMin = 1e-9;
 // Minimum Rho allowed
 const double RhoMin = 700.0;
 // Maximum Rho allowed
@@ -100,15 +102,15 @@ typedef vector_dist<3,double,aggregate<size_t,double,  double,    double,     do
 
 // NON Vanilla Entries
 
-const double kinematic_viscosity = 1e-1;
+const double kinematic_viscosity = 80.00;
 
 // 3d Cavity 
 double Xmin = 0.0;
 double Ymin = 0.0 - (dp * 3.0);
-double Zmin = 0.0;
+double Zmin = -dp * 4.0;
 double Xmax = 1.0;
 double Ymax = 1.0 + (dp * 3.0);
-double Zmax = 1.0;
+double Zmax =  dp * 4.0;
 
 double L_x = Xmax - Xmin;
 double L_y = Ymax - Ymin;

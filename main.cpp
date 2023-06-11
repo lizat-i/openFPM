@@ -13,11 +13,13 @@ int main(int argc, char *argv[])
     // initialize the library
     openfpm_init(&argc, &argv);
     particles vd = InitializeDomain_PoiseuilleFlow3d();
+    //particles vd = InitializeDomain_vanillaSPH();
 
     vd.map();
     vd.ghost_get<type, rho, Pressure, velocity>();
     vd.write_frame("output/Geometry", 0);
     auto NN = vd.getCellList(2 * H);
+
     // Evolve
     size_t write = 1;
     size_t it = 0;
@@ -49,7 +51,7 @@ int main(int argc, char *argv[])
         peng_int(vd, dt);
 
         t += dt;
-        if (write < t * 20)
+        if ((it%1)==0)
         {
             // sensor_pressure calculation require ghost and update cell - list
             vd.map();

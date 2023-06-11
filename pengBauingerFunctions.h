@@ -48,11 +48,12 @@ void peng_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]) * dt;
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]) * dt;
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt;
+
         vd.template getProp<rho>(a) = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
         // Check if the particle go out of range in space and in density
         if (vd.template getProp<rho>(a) < RhoMin || vd.template getProp<rho>(a) > RhoMax)
         {
-            // to_remove.add(a.getKey());
+            to_remove.add(a.getKey());
         }
         vd.template getProp<velocity_prev>(a)[0] = velX;
         vd.template getProp<velocity_prev>(a)[1] = velY;
@@ -207,7 +208,7 @@ inline void calc_forces_fluid(particles &vd, CellList &NN, double &max_visc, aut
             double partialDWAB = 0;
             DWab(dr, DW, r, false, partialDWAB);
 
-            double factor = -massb * ((vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob) + Tensile(r, rhoa, rhob, Pa, Pb) ) ; //+ Pi(dr, r2, v_rel, rhoa, rhob, massb, max_visc));
+            double factor = -massb * ((vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob) + Tensile(r, rhoa, rhob, Pa, Pb) + Pi(dr, r2, v_rel, rhoa, rhob, massb, kinematic_viscosity));
 
             vd.getProp<force>(a)[0] += factor * DW.get(0);
             vd.getProp<force>(a)[1] += factor * DW.get(1);
@@ -223,9 +224,9 @@ inline void calc_forces_fluid(particles &vd, CellList &NN, double &max_visc, aut
         }
         ++Np;
     }
-    vd.getProp<viscousFoces>(a)[0] = viscousFocesTermx/massa;
-    vd.getProp<viscousFoces>(a)[1] = viscousFocesTermy/massa;
-    vd.getProp<viscousFoces>(a)[2] = viscousFocesTermz/massa;
+    vd.getProp<viscousFoces>(a)[0] = 0*viscousFocesTermx/massa;
+    vd.getProp<viscousFoces>(a)[1] = 0*viscousFocesTermy/massa;
+    vd.getProp<viscousFoces>(a)[2] = 0*viscousFocesTermz/massa;
 }
 
 template <typename CellList>

@@ -99,20 +99,30 @@ inline double Tensile(double r, double rhoa, double rhob, double prs1, double pr
     const double tensilp2 = (prs2 / (rhob * rhob)) * (prs2 > 0 ? 0.01 : -0.2);
     return (fab * (tensilp1 + tensilp2));
 }
-inline double Pi(const Point<3,double> & dr, double rr2, Point<3,double> & dv, double rhoa, double rhob, double massb, double & visc)
+inline double Pi(const Point<3, double> &dr, double rr2, Point<3, double> &dv, double rhoa, double rhob, double massb, const double &kinematic_viscosity)
 {
-    const double dot = dr.get(0)*dv.get(0) + dr.get(1)*dv.get(1) + dr.get(2)*dv.get(2);
-    const double dot_rr2 = dot/(rr2+Eta2);
-    visc=std::max(dot_rr2,visc);
-    if(dot < 0)
-    {
-        const float amubar=H*dot_rr2;
-        const float robar=(rhoa+rhob)*0.5f;
-        const float pi_visc=(-visco*cbar*amubar/robar);
-        return pi_visc;
-    }
-    else
-        return 0.0;
+    double r = sqrt(norm2(dr));
+
+    const double dot = dr.get(0) * dv.get(0) + dr.get(1) * dv.get(1) + dr.get(2) * dv.get(2);
+    const double dot_dr = dr.get(0) * dr.get(0) + dr.get(1) * dr.get(1) + dr.get(2) * dr.get(2);
+
+    // const double dot_rr2 = dot / (rr2 + Eta2);
+    // double visc = std::max(dot_rr2, 0.1);
+    // if (dot < 0)
+    // {
+    //     const float amubar = H * dot_rr2;
+    //     const float robar = (rhoa + rhob) * 0.5f;
+    //     const float pi_visc = (-visco * cbar * amubar / robar);
+    //     return pi_visc;
+    // }
+    // else
+    //     return 0.0;
+
+    const double term1 = 8;
+    const double term2 = (kinematic_viscosity + kinematic_viscosity) / (rhoa + rhob);
+    const double term3 = r + Eta2;
+
+    return (term1 * term2 *dot / term3);
 }
 template <typename CellList>
 inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
@@ -264,6 +274,7 @@ double calc_deltaT(particles &vd, double ViscDtMax)
     double Maxacc = 0.0;
     double Maxvel = 0.0;
     max_acceleration_and_velocity(vd, Maxacc, Maxvel);
+
     //-dt1 depends on force per unit mass.
     const double dt_f = (Maxacc) ? sqrt(H / Maxacc) : std::numeric_limits<int>::max();
     //-dt2 combines the Courant and the viscous time-step controls.
@@ -273,7 +284,7 @@ double calc_deltaT(particles &vd, double ViscDtMax)
     if (dt < double(DtMin))
         dt = double(DtMin);
 
-    return dt*50;
+    return dt;
 }
 openfpm::vector<size_t> to_remove;
 size_t cnt = 0;

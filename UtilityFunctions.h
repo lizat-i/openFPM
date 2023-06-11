@@ -7,49 +7,33 @@
 
 particles InitializeDomain_vanillaSPH()
 {
-    // It contain for each time-step the value detected by the probes
-    openfpm::vector<openfpm::vector<double>> press_t;
 
-    // Here we define our domain a 2D box with internals from 0 to 1.0 for x and y
     Box<3, double> domain({-0.05, -0.05, -0.05}, {1.7010, 0.7065, 0.5025});
     size_t sz[3] = {207, 90, 66};
-    // Fill W_dap
     W_dap = 1.0 / Wab(H / 1.5);
-    // Here we define the boundary conditions of our problem
     size_t bc[3] = {NON_PERIODIC, NON_PERIODIC, NON_PERIODIC};
-    // extended boundary around the domain, and the processor domain
     Ghost<3, double> g(2 * H);
-
     particles vd(0, domain, bc, g, DEC_GRAN(512));
-    // You can ignore all these dp/2.0 is a trick to reach the same initialization
-    // of Dual-SPH that use a different criteria to draw particles
-
-    Box<3, double> fluid_box({0, 0, 0}, {1, 1, 1});
-    // return an iterator to the fluid particles to add to vd
+    Box<3, double> fluid_box({dp / 2.0, dp / 2.0, dp / 2.0}, {0.4 + dp / 2.0, 0.67 - dp / 2.0, 0.3 + dp / 2.0});
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
-    // here we fill some of the constants needed by the simulation
+
     max_fluid_height = fluid_it.getBoxMargins().getHigh(2);
     h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
-
     B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
-    // cbar = coeff_sound * sqrt(gravity * h_swl);
-    // for each particle inside the fluid box ...
+ 
+    int NrOfFluidParticles = 0;
     while (fluid_it.isNext())
     {
-        // ... add a particle ...
         vd.add();
-        // ... and set it position ...
         vd.getLastPos()[0] = fluid_it.get().get(0);
         vd.getLastPos()[1] = fluid_it.get().get(1);
         vd.getLastPos()[2] = fluid_it.get().get(2);
-        // and its type.
+
+        vd.template getLastProp<x_pre>()[0] = vd.getLastPos()[0];
+        vd.template getLastProp<x_pre>()[1] = vd.getLastPos()[1];
+        vd.template getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+
         vd.template getLastProp<type>() = FLUID;
-        // We also initialize the density of the particle and the hydro-static pressure given by
-        //
-        // rho_zero*g*h = P
-        //
-        // rho_p = (P/B + 1)^(1/Gamma) * rho_zero
-        //
         vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
         vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
         vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
@@ -59,69 +43,72 @@ particles InitializeDomain_vanillaSPH()
         vd.template getLastProp<velocity_prev>()[0] = 0.0;
         vd.template getLastProp<velocity_prev>()[1] = 0.0;
         vd.template getLastProp<velocity_prev>()[2] = 0.0;
-        // next fluid particle
         ++fluid_it;
-    }
-    // Recipient
-    Box<3, double> recipient1({0.0, 0.0, 0.0}, {1.6 + dp / 2.0, 0.67 + dp / 2.0, 0.4 + dp / 2.0});
-    Box<3, double> recipient2({dp, dp, dp}, {1.6 - dp / 2.0, 0.67 - dp / 2.0, 0.4 + dp / 2.0});
-    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2.0});
-    Box<3, double> obstacle2({0.9 + dp, 0.24 + dp / 2.0, 0.0}, {1.02 - dp / 2.0, 0.36 - dp, 0.45 - dp / 2.0});
-    Box<3, double> obstacle3({0.9 + dp, 0.24, 0.0}, {1.02, 0.36, 0.45});
-    openfpm::vector<Box<3, double>> holes;
-    holes.add(recipient2);
-    holes.add(obstacle1);
-    auto bound_box = DrawParticles::DrawSkin(vd, sz, domain, holes, recipient1);
-    while (bound_box.isNext())
-    {
-        vd.add();
-        vd.getLastPos()[0] = bound_box.get().get(0);
-        vd.getLastPos()[1] = bound_box.get().get(1);
-        vd.getLastPos()[2] = bound_box.get().get(2);
-        vd.template getLastProp<type>() = BOUNDARY;
-        vd.template getLastProp<rho>() = rho_zero;
-        vd.template getLastProp<rho_prev>() = rho_zero;
-        vd.template getLastProp<velocity>()[0] = 0.0;
-        vd.template getLastProp<velocity>()[1] = 0.0;
-        vd.template getLastProp<velocity>()[2] = 0.0;
-        vd.template getLastProp<velocity_prev>()[0] = 0.0;
-        vd.template getLastProp<velocity_prev>()[1] = 0.0;
-        vd.template getLastProp<velocity_prev>()[2] = 0.0;
-        ++bound_box;
-    }
-    auto obstacle_box = DrawParticles::DrawSkin(vd, sz, domain, obstacle2, obstacle1);
-    while (obstacle_box.isNext())
-    {
-        vd.add();
-        vd.getLastPos()[0] = obstacle_box.get().get(0);
-        vd.getLastPos()[1] = obstacle_box.get().get(1);
-        vd.getLastPos()[2] = obstacle_box.get().get(2);
-        vd.template getLastProp<type>() = BOUNDARY;
-        vd.template getLastProp<rho>() = rho_zero;
-        vd.template getLastProp<rho_prev>() = rho_zero;
-        vd.template getLastProp<velocity>()[0] = 0.0;
-        vd.template getLastProp<velocity>()[1] = 0.0;
-        vd.template getLastProp<velocity>()[2] = 0.0;
-        vd.template getLastProp<velocity_prev>()[0] = 0.0;
-        vd.template getLastProp<velocity_prev>()[1] = 0.0;
-        vd.template getLastProp<velocity_prev>()[2] = 0.0;
-        ++obstacle_box;
+        ++NrOfFluidParticles;
     }
 
-    return vd;
+    // Build domain with 6 boxes.
+    // first groundplate
+    Box<3, double> groundplate({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0 - 3.0 * dp}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.0 + dp / 2});
+    // xmin xmax plates
+    Box<3, double> xmin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {0.0 + dp / 2, 0.67 + dp * 3.0, 0.45 + dp / 2});
+    Box<3, double> xmax({1.6 - dp / 2, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.45 + dp / 2});
+    // ymin ymax plates
+    Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0 + dp / 2, 0.00, 0.4 + dp / 2});
+    Box<3, double> ymax({0.0 - 3 * dp, 0.67 + dp / 2, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4 + dp / 2});
+    // obstacle box
+    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45 + dp / 2});
+
+    openfpm::vector<Box<3, double>> obstacle_and_bound_box;
+
+    obstacle_and_bound_box.add(groundplate);
+    obstacle_and_bound_box.add(xmin);
+    obstacle_and_bound_box.add(xmax);
+    obstacle_and_bound_box.add(ymin);
+    obstacle_and_bound_box.add(ymax);
+    obstacle_and_bound_box.add(obstacle1);
+    std::cout << "draw box" << '\n';
+    for (size_t i = 0; i < 6; ++i)
+    {
+        std::cout << "for box number " << i << '\n';
+        Box<3, double> box = obstacle_and_bound_box.get(i);
+        auto toFill = DrawParticles::DrawBox(vd, sz, domain, box);
+
+        while (toFill.isNext())
+        {
+            vd.add();
+            vd.getLastPos()[0] = toFill.get().get(0);
+            vd.getLastPos()[1] = toFill.get().get(1);
+            vd.getLastPos()[2] = toFill.get().get(2);
+
+            vd.template getLastProp<x_pre>()[0] = vd.getLastPos()[0];
+            vd.template getLastProp<x_pre>()[1] = vd.getLastPos()[1];
+            vd.template getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+
+            vd.template getLastProp<type>() = BOUNDARY;
+            vd.template getLastProp<rho>() = rho_zero;
+            vd.template getLastProp<rho_prev>() = rho_zero;
+            vd.template getLastProp<velocity>()[0] = 0.0;
+            vd.template getLastProp<velocity>()[1] = 0.0;
+            vd.template getLastProp<velocity>()[2] = 0.0;
+            vd.template getLastProp<velocity_prev>()[0] = 0.0;
+            vd.template getLastProp<velocity_prev>()[1] = 0.0;
+            vd.template getLastProp<velocity_prev>()[2] = 0.0;
+            ++toFill;
+        }
+    }
 }
 
-particles InitializeDomain_PoiseuilleFlow3d(){
+particles InitializeDomain_PoiseuilleFlow3d()
+{
     // Initialize domain
-    Box<3, double> domain({0, -4*dp, 0}, {1, 1+4*dp, 1});
+    Box<3, double> domain({0, -4 * dp, -4 * dp}, {1, 1 + 4 * dp, 4 * dp});
     size_t sz[3] = {NumberOfParticles_x, NumberOfParticles_y, NumberOfParticles_z};
     size_t bc[3] = {PERIODIC, NON_PERIODIC, PERIODIC};
     Ghost<3, double> g(2 * H);
     particles vd(0, domain, bc, g, DEC_GRAN(512));
-
-
-
-    Box<3, double> fluid_box({0, 0, 0}, {1, 1, 1});
+    W_dap = 1.0 / Wab(H / 1.5);
+    Box<3, double> fluid_box({0, 0, -4 * dp}, {1, 1, 4 * dp});
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
 
     while (fluid_it.isNext())
@@ -154,8 +141,8 @@ particles InitializeDomain_PoiseuilleFlow3d(){
     }
 
     // Recipient
-    Box<3, double> yminplate({0.0, 0.0 - 4 * dp, 0.0}, {1.0, 0.0, 1.0});
-    Box<3, double> ymaxplate({0.0, 1.0, 0.0}, {1.0, 1.0 + 4 * dp, 1.0});
+    Box<3, double> yminplate({0.0, 0.0 - 4 * dp, -4 * dp}, {1.0, 0.0, 4 * dp});
+    Box<3, double> ymaxplate({0.0, 1.0, -4 * dp}, {1.0, 1.0 + 4 * dp, 4 * dp});
 
     openfpm::vector<Box<3, double>> BoundariesBoxes;
     BoundariesBoxes.add(yminplate);
@@ -163,6 +150,7 @@ particles InitializeDomain_PoiseuilleFlow3d(){
 
     for (size_t i = 0; i < 2; ++i)
     {
+        std::cout << "NumberOfParticles_z " << NumberOfParticles_z << '\n';
         std::cout << "for box number " << i << '\n';
         Box<3, double> box = BoundariesBoxes.get(i);
         auto toFill = DrawParticles::DrawBox(vd, sz, domain, box);
@@ -196,6 +184,6 @@ particles InitializeDomain_PoiseuilleFlow3d(){
             ++toFill;
         }
     }
- 
+
     return vd;
 }
