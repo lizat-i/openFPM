@@ -141,8 +141,8 @@ particles InitializeDomain_PoiseuilleFlow3d()
     }
 
     // Recipient
-    Box<3, double> yminplate({0.0, 0.0 - 4 * dp, -4 * dp}, {1.0, 0.0, 4 * dp});
-    Box<3, double> ymaxplate({0.0, 1.0, -4 * dp}, {1.0, 1.0 + 4 * dp, 4 * dp});
+    Box<3, double> yminplate(   {0.0, 0.0 - 4 * dp  , -4 * dp} ,    {1.0,   0.0,            4 * dp});
+    Box<3, double> ymaxplate(   {0.0, 1.0           , -4 * dp} ,    {1.0,   1.0 + 4 * dp,   4 * dp});
 
     openfpm::vector<Box<3, double>> BoundariesBoxes;
     BoundariesBoxes.add(yminplate);

@@ -8,13 +8,14 @@
 
 void peng_int(particles &vd, double dt)
 {
-    // list of the particle to remove
+ 
     to_remove.clear();
-    // particle iterator
+ 
     auto part = vd.getDomainIterator();
     double dt205 = dt * dt * 0.5;
     double dt2 = dt * 2.0;
-    // For each particle ...
+ 
+
     while (part.isNext())
     {
         // ... a
@@ -206,15 +207,19 @@ inline void calc_forces_fluid(particles &vd, CellList &NN, double &max_visc, aut
             Point<3, double> v_rel = va - vb;
             Point<3, double> DW;
             double partialDWAB = 0;
+
             DWab(dr, DW, r, false, partialDWAB);
 
-            double factor = -massb * ((vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob) + Tensile(r, rhoa, rhob, Pa, Pb) + Pi(dr, r2, v_rel, rhoa, rhob, massb, kinematic_viscosity));
+            double factor = -massb * ((vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob) + Tensile(r, rhoa, rhob, Pa, Pb)); //+ Pi(dr, r2, v_rel, rhoa, rhob, massb, kinematic_viscosity));
 
             vd.getProp<force>(a)[0] += factor * DW.get(0);
             vd.getProp<force>(a)[1] += factor * DW.get(1);
             vd.getProp<force>(a)[2] += factor * DW.get(2);
 
-            double viscousForcesFactor = -((2*kinematic_viscosity*kinematic_viscosity)/(kinematic_viscosity + kinematic_viscosity)) * (Va * Va + Vb * Vb)*(partialDWAB / r);
+            double dotProduct_dWab_dr = (dr.get(0)*1/r)*DW.get(0) + (dr.get(1)*1/r)*DW.get(1) + (dr.get(2)*1/r)DW.get(2);
+ 
+
+            double viscousForcesFactor = -((2*kinematic_viscosity*kinematic_viscosity)/(kinematic_viscosity + kinematic_viscosity)) * (Va * Va + Vb * Vb)*(dotProduct_dWab_dr / r);
 
             viscousFocesTermx += viscousForcesFactor * v_rel.get(0);
             viscousFocesTermy += viscousForcesFactor * v_rel.get(1);
@@ -224,9 +229,9 @@ inline void calc_forces_fluid(particles &vd, CellList &NN, double &max_visc, aut
         }
         ++Np;
     }
-    vd.getProp<viscousFoces>(a)[0] = 0*viscousFocesTermx/massa;
-    vd.getProp<viscousFoces>(a)[1] = 0*viscousFocesTermy/massa;
-    vd.getProp<viscousFoces>(a)[2] = 0*viscousFocesTermz/massa;
+    vd.getProp<viscousFoces>(a)[0] = viscousFocesTermx/massa;
+    vd.getProp<viscousFoces>(a)[1] = viscousFocesTermy/massa;
+    vd.getProp<viscousFoces>(a)[2] = viscousFocesTermz/massa;
 }
 
 template <typename CellList>

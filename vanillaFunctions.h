@@ -106,23 +106,24 @@ inline double Pi(const Point<3, double> &dr, double rr2, Point<3, double> &dv, d
     const double dot = dr.get(0) * dv.get(0) + dr.get(1) * dv.get(1) + dr.get(2) * dv.get(2);
     const double dot_dr = dr.get(0) * dr.get(0) + dr.get(1) * dr.get(1) + dr.get(2) * dr.get(2);
 
-    // const double dot_rr2 = dot / (rr2 + Eta2);
-    // double visc = std::max(dot_rr2, 0.1);
-    // if (dot < 0)
-    // {
-    //     const float amubar = H * dot_rr2;
-    //     const float robar = (rhoa + rhob) * 0.5f;
-    //     const float pi_visc = (-visco * cbar * amubar / robar);
-    //     return pi_visc;
-    // }
-    // else
-    //     return 0.0;
+    const double dot_rr2 = dot / (rr2 + Eta2);
+    double visc = std::max(dot_rr2, 0.1);
+    if (dot < 0)
+    {
+        const float amubar = H * dot_rr2;
+        const float robar = (rhoa + rhob) * 0.5f;
+        const float pi_visc = (-visco * cbar * amubar / robar);
 
-    const double term1 = 8;
-    const double term2 = (kinematic_viscosity + kinematic_viscosity) / (rhoa + rhob);
-    const double term3 = r + Eta2;
+        return pi_visc;
+    }
+    else
+        return 0.0;
 
-    return (term1 * term2 *dot / term3);
+    // const double term1 = 8;
+    // const double term2 = (kinematic_viscosity + kinematic_viscosity) / (rhoa + rhob);
+    // const double term3 = r + Eta2;
+
+    // return (term1 * term2 *dot / term3);
 }
 template <typename CellList>
 inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
