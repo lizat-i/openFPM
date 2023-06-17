@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     obstacle_and_bound_box.add(obstacle1);
 
     std::cout << "draw box" << '\n';
-    for (size_t i = 0; i < 6; ++i)
+    for (size_t i = 0; i < 5; ++i)
     {
         // std::cout << "for box number " << i << '\n';
         Box<3, double> box = obstacle_and_bound_box.get(i);
