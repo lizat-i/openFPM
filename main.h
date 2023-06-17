@@ -11,7 +11,7 @@
 // initial spacing between particles dp in the formulas
 double eps = std::numeric_limits<double>::epsilon();
 
-const double dp = 0.0085;
+const double dp = 0.02;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
 double h_swl = 0.0;
