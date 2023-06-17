@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
             it = 0;
         }
         t += dt;
-        if (write_coounter % 1000 == 0)
+        if (write_coounter % 100 == 0)
         {
             // sensor_pressure calculation require ghost and update cell-list
             vd.map();

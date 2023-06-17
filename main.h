@@ -11,7 +11,7 @@
 // initial spacing between particles dp in the formulas
 double eps = std::numeric_limits<double>::epsilon();
 
-const double dp = 0.02;
+const double dp = 0.0085;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
 double h_swl = 0.0;
@@ -20,7 +20,11 @@ const double coeff_sound = 20.0;
 // gamma in the formulas
 const double gamma_ = 7.0;
 // sqrt(3.0*dp*dp) support of the kernel
-const double H = 0.0147224318643;
+const double H = sqrt(3.0 * dp * dp);
+// number of kappa
+const double kappa = 2.0;
+// number of kappa
+const double smoothingRadius = kappa * H;
 // Eta in the formulas
 const double Eta2 = 0.01 * H * H;
 // alpha in the formula
@@ -47,7 +51,7 @@ double B = 0.0;
 // Constant used to define time integration
 const double CFLnumber = 0.2;
 // Minimum T
-const double DtMin = 2.35 * 1e-5;
+const double DtMin = 1.00 * 1e-5;
 // Minimum Rho allowed
 const double RhoMin = 700.0;
 // Maximum Rho allowed
@@ -214,20 +218,12 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
         // ... a
         auto a = part.get();
 
-        // Get the position xp of the particle
         Point<3, double> xa = vd.getPos(a);
-
-        // Take the mass of the particle dependently if it is FLUID or BOUNDARY
-        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
-
-        // Get the density of the of the particle a
-        double rhoa = vd.getProp<rho>(a);
-
-        // Get the pressure of the particle a
-        double Pa = vd.getProp<Pressure>(a);
-
-        // Get the Velocity of the particle a
         Point<3, double> va = vd.getProp<velocity>(a);
+
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
+        double rhoa = vd.getProp<rho>(a);
+        double Pa = vd.getProp<Pressure>(a);
 
         // Reset the force counter (- gravity on zeta direction)
         vd.template getProp<force>(a)[0] = bodyforce[0];
@@ -260,9 +256,10 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
 
                 // Get the position xp of the particle
                 Point<3, double> xb = vd.getPos(b);
-                double pressure_b = vd.getProp<Pressure>(b);
                 Point<3, double> vb = vd.getProp<velocity>(b);
-                // if (p == q) skip this particle
+
+                double pressure_b = vd.getProp<Pressure>(b);
+
                 if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
                 {
                     ++Np;
@@ -273,14 +270,15 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
                 double rhob = vd.getProp<rho>(b);
                 Point<3, double> dr = xa - xb;
-                // take the norm of this vector
+
                 double r2 = norm2(dr);
+                double r = sqrt(r2);
 
                 // If the particles interact ...
-                if (r2 < 4.0 * H * H)
+                if (r < smoothingRadius)
                 {
 
-                    double wab = Wab(sqrt(r2));
+                    double wab = Wab(r);
                     kernel += wab;
                     rho_wab += rhob * wab;
                     p_wab += pressure_b * wab;
@@ -296,7 +294,7 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
             double cand_pressure = (p_wab + g_wab) / kernel;
             double cand_density = rho_wab / kernel;
 
-            vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
+            vd.getProp<rho>(a) = (cand_density > rho_zero) ? cand_density : rho_zero;
             vd.getProp<Pressure>(a) = (cand_pressure > 0.0) ? cand_pressure : 0.0;
 
             vd.template getProp<velocity>(a)[0] = (kernel > 0.0) ? -v_wab_vectorial[0] / kernel : 0;
@@ -324,27 +322,26 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                     continue;
                 };
 
-                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
                 Point<3, double> vb = vd.getProp<velocity>(b);
+                Point<3, double> dr = xa - xb;
                 double Pb = vd.getProp<Pressure>(b);
                 double rhob = vd.getProp<rho>(b);
-
-                Point<3, double> dr = xa - xb;
+                double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
                 double r2 = norm2(dr);
+                double r = sqrt(r2);
 
-                // if they interact
-                if (r2 < 4.0 * H * H)
+                // If the particles interact ...
+                if (r < smoothingRadius)
                 {
-                    double r = sqrt(r2);
 
                     Point<3, double> v_rel = va - vb;
                     Point<3, double> DW;
-                    Point<3, double> e_ab = dr*(1/r);
+                    Point<3, double> e_ab = dr * (1 / r);
                     DWab(dr, DW, r, false);
-                    double  wab= Wab(sqrt(r2));
+                    double wab = Wab(r);
                     double Va = massa / rhoa;
                     double Vb = massb / rhob;
-                    kernel +=wab           ;
+                    kernel += wab;
 
                     double factor = -massb * ((vd.getProp<Pressure>(a) + vd.getProp<Pressure>(b)) / (rhoa * rhob) + Tensile(r, rhoa, rhob, Pa, Pb) + Pi(dr, r2, v_rel, rhoa, rhob, massb, max_visc));
 
@@ -354,16 +351,16 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
 
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
 
-                    double dotProduct_dWab_dr = e_ab.get(0)*DW.get(0) + e_ab.get(1)*DW.get(1) + e_ab.get(2)*DW.get(2)   ;
+                    //double dotProduct_dWab_dr = e_ab.get(0) * DW.get(0) + e_ab.get(1) * DW.get(1) + e_ab.get(2) * DW.get(2);
+                    double dotProduct_dWab_dr = e_ab.get(0) * DW.get(0) + e_ab.get(1) * DW.get(1) + e_ab.get(2) * DW.get(2);
 
-                    double viscousForcesFactor = -((2 * kinematic_viscosity * kinematic_viscosity) / (kinematic_viscosity + kinematic_viscosity)) * (Va * Va + Vb * Vb) * (dotProduct_dWab_dr / r);
+                    double viscousForcesFactor = -((2 * kinematic_viscosity * kinematic_viscosity) / (kinematic_viscosity + kinematic_viscosity)) * (Va * Va + Vb * Vb) * (dotProduct_dWab_dr);
 
-                    viscousFocesTermx += viscousForcesFactor * v_rel.get(0);
-                    viscousFocesTermy += viscousForcesFactor * v_rel.get(1);
-                    viscousFocesTermz += viscousForcesFactor * v_rel.get(2);
+                    viscousFocesTermx += viscousForcesFactor * v_rel.get(0)*(1/r);
+                    viscousFocesTermy += viscousForcesFactor * v_rel.get(1)*(1/r);
+                    viscousFocesTermz += viscousForcesFactor * v_rel.get(2)*(1/r);
 
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
-
                 }
                 ++Np;
             }
@@ -371,11 +368,10 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
             viscousFocesTermy = viscousFocesTermy * (1 / massa);
             viscousFocesTermz = viscousFocesTermz * (1 / massa);
 
-            //std::cout<<viscousFocesTermx<< " " <<"\n"; //<< viscousFocesTermy<< " " << viscousFocesTermz<< " " 
+            // std::cout<<viscousFocesTermx<< " " <<"\n"; //<< viscousFocesTermy<< " " << viscousFocesTermz<< " "
             vd.getProp<viscousFoces>(a)[0] = (kernel > 0.0) ? viscousFocesTermx : 0.0;
             vd.getProp<viscousFoces>(a)[1] = (kernel > 0.0) ? viscousFocesTermy : 0.0;
             vd.getProp<viscousFoces>(a)[2] = (kernel > 0.0) ? viscousFocesTermz : 0.0;
-
         }
         ++part;
     }
@@ -466,7 +462,7 @@ void verlet_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt2;
 
         double CandidateDensity = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
-        vd.template getProp<rho>(a) = (CandidateDensity > 0.0) ? CandidateDensity : rho_zero;
+        vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
 
         // Check if the particle go out of range in space and in density
         // if (
@@ -531,7 +527,7 @@ void euler_int(particles &vd, double dt)
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt;
 
         double CandidateDensity = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
-        vd.template getProp<rho>(a) = (CandidateDensity > 0.0) ? CandidateDensity : rho_zero;
+        vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
 
         // // Check if the particle go out of range in space and in density
         // if (
