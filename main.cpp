@@ -9,13 +9,13 @@ int main(int argc, char *argv[])
     openfpm::vector<openfpm::vector<double>> press_t;
     openfpm::vector<Point<3, double>> probes;
 
-    double Xmin = 0 - 3 * dp;
-    double Ymin = 0 - 3 * dp;
-    double Zmin = 0 - 3 * dp;
+    double Xmin = 0;
+    double Ymin = 0 - 10 * dp;
+    double Zmin = -2 * dp;
 
-    double Xmax = 1.6 + 3 * dp;
-    double Ymax = 0.67 + 3 * dp;
-    double Zmax = 0.45;
+    double Xmax = 1.0;
+    double Ymax = 1.0 + 3 * dp;
+    double Zmax = +2 * dp;
 
     double L_x = Xmax - Xmin;
     double L_y = Ymax - Ymin;
@@ -35,14 +35,13 @@ int main(int argc, char *argv[])
     // Fill W_dap
     W_dap = 1.0 / Wab(H / 1.5);
     // Here we define the boundary conditions of our problem
-    size_t bc[3] = {NON_PERIODIC, NON_PERIODIC, NON_PERIODIC};
+    size_t bc[3] = {PERIODIC, NON_PERIODIC, PERIODIC};
     // extended boundary around the domain, and the processor domain
     Ghost<3, double> g(2 * H);
 
     particles vd(0, domain, bc, g, DEC_GRAN(512));
-    // You can ignore all these dp/2.0 is a trick to reach the same initialization
-    // of Dual-SPH that use a different criteria to draw particles
-    Box<3, double> fluid_box({0.0, 0.0, 0.0}, {0.4, 0.67, 0.3});
+
+    Box<3, double> fluid_box({0.0, 0.0, 0.0}, {1.0, 1.0, 1.0});
     // return an iterator to the fluid particles to add to vd
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
     // here we fill some of the constants needed by the simulation
@@ -77,29 +76,20 @@ int main(int argc, char *argv[])
         ++NrOfFluidParticles;
     }
 
-    // Build domain with 6 boxes.
-    // first groundplate
-    Box<3, double> groundplate({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0 - 3.0 * dp}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.0});
 
-    Box<3, double> xmin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {0.0, 0.67 + dp * 3.0, 0.40});
-    Box<3, double> xmax({1.6 - dp / 2, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4});
-
-    Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.6 + dp * 3.0, 0.00, 0.4});
-    Box<3, double> ymax({0.0 - 3 * dp, 0.67, 0.0}, {1.6 + dp * 3.0, 0.67 + dp * 3.0, 0.4});
+    Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.0 + dp * 3.0, 0.00, 1.0});
+    Box<3, double> ymax({0.0 - 3 * dp, 1.0, 0.0}, {1.0 + dp * 3.0, 1.0 + dp * 3.0, 1.0});
     // obstacle box
-    Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.45});
+    // Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.5});
 
     openfpm::vector<Box<3, double>> obstacle_and_bound_box;
 
-    obstacle_and_bound_box.add(groundplate);
-    obstacle_and_bound_box.add(xmin);
-    obstacle_and_bound_box.add(xmax);
     obstacle_and_bound_box.add(ymin);
     obstacle_and_bound_box.add(ymax);
-    obstacle_and_bound_box.add(obstacle1);
+    // obstacle_and_bound_box.add(obstacle1);
 
     std::cout << "draw box" << '\n';
-    for (size_t i = 0; i < 5; ++i)
+    for (size_t i = 0; i < 2; ++i)
     {
         // std::cout << "for box number " << i << '\n';
         Box<3, double> box = obstacle_and_bound_box.get(i);

@@ -11,7 +11,7 @@
 // initial spacing between particles dp in the formulas
 double eps = std::numeric_limits<double>::epsilon();
 
-const double dp = 0.02;
+const double dp = 0.0085;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
 double h_swl = 0.0;
@@ -78,7 +78,7 @@ const int velocity_prev = 7;
 // Type of the vector containing particles
 const int viscousFoces = 8;
 // Type of the vector containing particles
-const double bodyforce[3] = {0, 0, -gravity};
+const double bodyforce[3] = {gravity, 0.0, 0.0};
 // velocity at previous step
 const double kinematic_viscosity = 0.1;
 
@@ -147,7 +147,7 @@ const double c2 = -3.0 / 4.0 / M_PI / H / H / H / H;
 const double a2_4 = 0.25 * a2;
 // Filled later
 double W_dap = 0.0;
-inline void DWab(Point<3, double> &dx, Point<3, double> &DW, double r, bool print)
+inline void DWab(Point<3, double> &dx, Point<3, double> &DW, double r, bool print, double &factor )
 {
     const double qq = r / H;
     double qq2 = qq * qq;
@@ -156,7 +156,7 @@ inline void DWab(Point<3, double> &dx, Point<3, double> &DW, double r, bool prin
     double wqq = (2.0 - qq);
     double fac2 = c2 * wqq * wqq / r;
     double b2 = (qq >= 1.0 && qq < 2.0) ? 1.0f : 0.0f;
-    double factor = (b1 * fac1 + b2 * fac2);
+    factor = (b1 * fac1 + b2 * fac2);
     DW.get(0) = factor * dx.get(0);
     DW.get(1) = factor * dx.get(1);
     DW.get(2) = factor * dx.get(2);
@@ -206,13 +206,8 @@ template <typename CellList>
 inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
 {
     auto part = vd.getDomainIterator();
-
-    // Update the cell-list
-    // std::cout << "exit updateCellList" << std::endl;
     vd.updateCellList(NN);
-    // std::cout << "exit updateCellList" << std::endl;
-
-    // For each particle ...
+ 
     while (part.isNext())
     {
         // ... a
@@ -226,9 +221,9 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
         double Pa = vd.getProp<Pressure>(a);
 
         // Reset the force counter (- gravity on zeta direction)
-        vd.template getProp<force>(a)[0] = bodyforce[0];
-        vd.template getProp<force>(a)[1] = bodyforce[1];
-        vd.template getProp<force>(a)[2] = bodyforce[2];
+        vd.template getProp<force>(a)[0] = 0.0;
+        vd.template getProp<force>(a)[1] = 0.0;
+        vd.template getProp<force>(a)[2] = 0.0;
 
         vd.template getProp<viscousFoces>(a)[0] = 0.0;
         vd.template getProp<viscousFoces>(a)[1] = 0.0;
@@ -337,7 +332,8 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                     Point<3, double> v_rel = va - vb;
                     Point<3, double> DW;
                     Point<3, double> e_ab = dr * (1 / r);
-                    DWab(dr, DW, r, false);
+                    double derivativeKernel = 0.0 ;
+                    DWab(dr, DW, r, false,derivativeKernel);
                     double wab = Wab(r);
                     double Va = massa / rhoa;
                     double Vb = massb / rhob;
@@ -352,9 +348,9 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                     vd.getProp<drho>(a) += massb * (v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2));
 
                     //double dotProduct_dWab_dr = e_ab.get(0) * DW.get(0) + e_ab.get(1) * DW.get(1) + e_ab.get(2) * DW.get(2);
-                    double dotProduct_dWab_dr = e_ab.get(0) * DW.get(0) + e_ab.get(1) * DW.get(1) + e_ab.get(2) * DW.get(2);
 
-                    double viscousForcesFactor = -((2 * kinematic_viscosity * kinematic_viscosity) / (kinematic_viscosity + kinematic_viscosity)) * (Va * Va + Vb * Vb) * (dotProduct_dWab_dr);
+
+                    double viscousForcesFactor = ((2 * kinematic_viscosity * kinematic_viscosity) / (kinematic_viscosity + kinematic_viscosity)) * (Va * Va + Vb * Vb) * (derivativeKernel);
 
                     viscousFocesTermx += viscousForcesFactor * v_rel.get(0)*(1/r);
                     viscousFocesTermy += viscousForcesFactor * v_rel.get(1)*(1/r);
@@ -446,9 +442,9 @@ void verlet_int(particles &vd, double dt)
             continue;
         }
         //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]) * dt205;
-        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]) * dt205;
-        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt205;
+        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0] +   bodyforce[0]) * dt205;
+        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1] +   bodyforce[1]) * dt205;
+        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2] +   bodyforce[2]) * dt205;
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
         vd.getPos(a)[2] += dz;
@@ -457,9 +453,9 @@ void verlet_int(particles &vd, double dt)
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
 
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]) * dt2;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]) * dt2;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt2;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0] + bodyforce[0]) * dt2;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1] + bodyforce[1]) * dt2;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2] + bodyforce[2]) * dt2;
 
         double CandidateDensity = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
@@ -512,9 +508,9 @@ void euler_int(particles &vd, double dt)
             continue;
         }
         //-Calculate displacement and update position / Calcula desplazamiento y actualiza posicion.
-        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]) * dt205;
-        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]) * dt205;
-        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt205;
+        double dx = vd.template getProp<velocity>(a)[0] * dt + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]+   bodyforce[0]) * dt205;
+        double dy = vd.template getProp<velocity>(a)[1] * dt + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]+   bodyforce[1]) * dt205;
+        double dz = vd.template getProp<velocity>(a)[2] * dt + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]+   bodyforce[2]) * dt205;
         vd.getPos(a)[0] += dx;
         vd.getPos(a)[1] += dy;
         vd.getPos(a)[2] += dz;
@@ -522,9 +518,9 @@ void euler_int(particles &vd, double dt)
         double velY = vd.template getProp<velocity>(a)[1];
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]) * dt;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]) * dt;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]) * dt;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<force>(a)[0] + vd.template getProp<viscousFoces>(a)[0]+   bodyforce[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<force>(a)[1] + vd.template getProp<viscousFoces>(a)[1]+   bodyforce[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<force>(a)[2] + vd.template getProp<viscousFoces>(a)[2]+   bodyforce[2]) * dt;
 
         double CandidateDensity = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
