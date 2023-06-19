@@ -10,12 +10,12 @@ int main(int argc, char *argv[])
     openfpm::vector<Point<3, double>> probes;
 
     double Xmin = 0;
-    double Ymin = 0 - 10 * dp;
-    double Zmin = -2 * dp;
+    double Ymin = 0 - 3 * dp;
+    double Zmin = -3 * dp;
 
     double Xmax = 1.0;
     double Ymax = 1.0 + 3 * dp;
-    double Zmax = +2 * dp;
+    double Zmax = +3 * dp;
 
     double L_x = Xmax - Xmin;
     double L_y = Ymax - Ymin;
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 
     particles vd(0, domain, bc, g, DEC_GRAN(512));
 
-    Box<3, double> fluid_box({0.0, 0.0, 0.0}, {1.0, 1.0, 1.0});
+    Box<3, double> fluid_box({Xmin + 0.1 * dp, 0.0, Zmin + 0.1 * dp}, {Xmax - 0.1 * dp, 1.0, Zmax - 0.1 * dp});
     // return an iterator to the fluid particles to add to vd
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
     // here we fill some of the constants needed by the simulation
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
         vd.getLastPos()[2] = fluid_it.get().get(2);
 
         vd.template getLastProp<type>() = FLUID;
-        vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
+        vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2)) + backgroundPressure;
         vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
         vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
         vd.template getLastProp<velocity>()[0] = 0.0;
@@ -76,9 +76,8 @@ int main(int argc, char *argv[])
         ++NrOfFluidParticles;
     }
 
-
-    Box<3, double> ymin({0.0 - 3 * dp, 0.0 - 3 * dp, 0.0}, {1.0 + dp * 3.0, 0.00, 1.0});
-    Box<3, double> ymax({0.0 - 3 * dp, 1.0, 0.0}, {1.0 + dp * 3.0, 1.0 + dp * 3.0, 1.0});
+    Box<3, double> ymin({Xmin + 0.1 * dp, 0.0 - 3 * dp, Zmin + 0.1 * dp}, {Xmax - 0.1 * dp, 0.00, Zmax - 0.1 * dp});
+    Box<3, double> ymax({Xmin + 0.1 * dp, 1.0, Zmin + 0.1 * dp}, {Xmax - 0.1 * dp, 1.0 + dp * 3.0, Zmax - 0.1 * dp});
     // obstacle box
     // Box<3, double> obstacle1({0.9, 0.24 - dp / 2.0, 0.0}, {1.02 + dp / 2.0, 0.36, 0.5});
 
@@ -103,6 +102,7 @@ int main(int argc, char *argv[])
             vd.getLastPos()[2] = toFill.get().get(2);
 
             vd.template getLastProp<type>() = BOUNDARY;
+            vd.template getLastProp<Pressure>() = backgroundPressure;
             vd.template getLastProp<rho>() = rho_zero;
             vd.template getLastProp<rho_prev>() = rho_zero;
             vd.template getLastProp<velocity>()[0] = 0.0;
