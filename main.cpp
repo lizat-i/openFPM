@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
               << "\n";
     Box<3, double> domain({Xmin, Ymin, Zmin}, {Xmax, Ymax, Zmax});
     size_t sz[3] = {Nr_x, Nr_y, Nr_z};
- 
+
     W_dap = 1.0 / Wab(H / 1.5);
     size_t bc[3] = {NON_PERIODIC, NON_PERIODIC, NON_PERIODIC};
     Ghost<3, double> g(2 * H);
@@ -37,7 +37,6 @@ int main(int argc, char *argv[])
     Box<3, double> fluid_box({0.0, 0.0, 0.0}, {0.4, 0.67, 0.3});
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
 
-    
     // here we fill some of the constants needed by the simulation
     max_fluid_height = fluid_it.getBoxMargins().getHigh(2);
     h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
@@ -143,6 +142,7 @@ int main(int argc, char *argv[])
     double t = 0.0;
     while (t <= t_end)
     {
+        // Domain Housekeepng
         Vcluster<> &v_cl = create_vcluster();
         timer it_time;
         it_reb++;
@@ -156,31 +156,35 @@ int main(int argc, char *argv[])
                 std::cout << "REBALANCED " << std::endl;
         }
         vd.map();
-        // Calculate pressure from the density
-        // std::cout << "EqState " << std::endl;
-        EqState(vd);
+
+        // Enter relevant loop
         double max_visc = 0.0;
-        vd.ghost_get<type, rho, Pressure, velocity>();
-        // Calc forces
-        // std::cout << "enter calc_forces " << std::endl;
-        calc_forces(vd, NN, max_visc);
-        // std::cout << "exit calc_forces " << std::endl;
-        // Get the maximum viscosity term across processors
-        v_cl.max(max_visc);
-        v_cl.execute();
-        // Calculate delta t integration
-        double dt = calc_deltaT(vd, max_visc);
-        // VerletStep or euler step
+        Init_Loop(vd, NN, max_visc);
+
+        double densityError = 0.0;
+        int iterCount = 0;
+        const double dt = 0.05 * H / 3.0;
+
+        while (densityError > maxDensityVariation || iterCount < 3)
+        {
+            double densityError = 0.0;
+            position_and_velocity_prediction(vd, dt);
+            vd.ghost_get<type, rho, Pressure, velocity>();
+            predictDensityAndUpdate(vd, NN, max_visc, dt, densityError);
+            calc_Pressure_forces(vd, NN, max_visc);
+
+            std::cout << "density iteration = " << iterCount << std::endl;
+            std::cout << "density Error = " << densityError << std::endl;
+
+            v_cl.max(max_visc);
+            v_cl.execute();
+            v_cl.max(densityError);
+            v_cl.execute();
+            ++iterCount;
+        }
         it++;
         write_coounter++;
-        // if (it < 40)
-        //     verlet_int(vd, dt);
-        // else
-        // {
-        //     euler_int(vd, dt);
-        //     it = 0;
-        // }
-        stroemer_verlet_int(vd,dt)  ;
+        stroemer_verlet_int(vd, dt);
         t += dt;
         if (write_coounter % 100 == 0)
         {
