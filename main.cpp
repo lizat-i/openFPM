@@ -27,29 +27,23 @@ int main(int argc, char *argv[])
 
     std::cout << "Nr of particles in x, y, z : " << Nr_x << " " << Nr_y << " " << Nr_z << " "
               << "\n";
-
-    // Here we define our domain a 2D box with internals from 0 to 1.0 for x and y
     Box<3, double> domain({Xmin, Ymin, Zmin}, {Xmax, Ymax, Zmax});
-
     size_t sz[3] = {Nr_x, Nr_y, Nr_z};
-    // Fill W_dap
+ 
     W_dap = 1.0 / Wab(H / 1.5);
-    // Here we define the boundary conditions of our problem
     size_t bc[3] = {NON_PERIODIC, NON_PERIODIC, NON_PERIODIC};
-    // extended boundary around the domain, and the processor domain
     Ghost<3, double> g(2 * H);
-
     particles vd(0, domain, bc, g, DEC_GRAN(512));
-    // You can ignore all these dp/2.0 is a trick to reach the same initialization
-    // of Dual-SPH that use a different criteria to draw particles
     Box<3, double> fluid_box({0.0, 0.0, 0.0}, {0.4, 0.67, 0.3});
-    // return an iterator to the fluid particles to add to vd
     auto fluid_it = DrawParticles::DrawBox(vd, sz, domain, fluid_box);
+
+    
     // here we fill some of the constants needed by the simulation
     max_fluid_height = fluid_it.getBoxMargins().getHigh(2);
     h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
     B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
     cbar = coeff_sound * sqrt(gravity * h_swl);
+
     int NrOfFluidParticles = 0;
     while (fluid_it.isNext())
     {
@@ -179,13 +173,14 @@ int main(int argc, char *argv[])
         // VerletStep or euler step
         it++;
         write_coounter++;
-        if (it < 40)
-            verlet_int(vd, dt);
-        else
-        {
-            euler_int(vd, dt);
-            it = 0;
-        }
+        // if (it < 40)
+        //     verlet_int(vd, dt);
+        // else
+        // {
+        //     euler_int(vd, dt);
+        //     it = 0;
+        // }
+        stroemer_verlet_int(vd,dt)  ;
         t += dt;
         if (write_coounter % 100 == 0)
         {
