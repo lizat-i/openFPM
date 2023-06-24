@@ -83,9 +83,11 @@ const int x_pre = 9;
 const double bodyforce[3] = {0, 0, -gravity};
 // velocity at previous step
 const double kinematic_viscosity = 0.1;
-
 // velocity at previous step
 const double maxDensityVariation = 0.01;
+
+// velocity at previous step
+const double intPConst = 0.5;
 
 double Xmin = 0.0;
 double Ymin = 0.0;
@@ -813,6 +815,7 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
         vd.getProp<drho>(a) = 0.0;
         double densityTerm1 = 0.0;
         double densityTerm2 = 0.0;
+        double pressureNeighbouring = 0.0;
         double term_1 = 0.0;
         Point<3, double> term_2 = {0, 0, 0};
         vd.getProp<rho>(a) = vd.getProp<rho_prev>(a);
@@ -857,8 +860,10 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
                 // outFile << "dotproductTerms  " <<dotProdut_dr_DW << std::endl;
 
                 // Desnsity Predicition Terms
-                term_1 += massa * massb * DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2);
-                term_2 += massb * DW;
+                term_1 +=  DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2);
+                term_2 +=  DW;
+
+                pressureNeighbouring += massb / rhob * Pb * wab;
             }
             ++Np;
         }
@@ -879,11 +884,15 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
         double dt2 = dt * dt;
         double massa2 = massa * massa;
         double rho_zero2 = rho_zero * rho_zero;
-
-        double K_i = rho_zero2 / dt2 / beta;
+        double K_i = rho_zero2/ (massa2 * dt2 *beta);
 
         double delptaP = K_i * rho_error;
-        vd.getProp<Pressure>(a) += delptaP;
+
+        double predicted_Pressure = vd.getProp<Pressure>(a) + delptaP;
+
+        double interpolP = predicted_Pressure * intPConst + (1 - intPConst) * pressureNeighbouring;
+
+        vd.getProp<Pressure>(a) = interpolP;
 
         ++part;
     }
@@ -1029,8 +1038,8 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         }
         g_wab = g_wab_vectorial.get(0) * bodyforce[0] + g_wab_vectorial.get(1) * bodyforce[1] + g_wab_vectorial.get(2) * bodyforce[2];
 
-        // double cand_pressure = (p_wab + g_wab) / kernel;
-        double cand_pressure = (p_wab) / kernel;
+        double cand_pressure = (p_wab + g_wab) / kernel;
+        //double cand_pressure = (p_wab) / kernel;
         double cand_density = rho_wab / kernel;
 
         vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
