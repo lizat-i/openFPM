@@ -648,7 +648,7 @@ void stroemer_verlet_int(particles &vd, double dt)
             vd.template getProp<velocity>(a)[0] = 0.0;
             vd.template getProp<velocity>(a)[1] = 0.0;
             vd.template getProp<velocity>(a)[2] = 0.0;
-            vd.template getProp<Pressure>(a)[2] = 0.0;
+            // vd.template getProp<Pressure>(a) = 0.0;
 
             vd.template getProp<rho_prev>(a) = rhop;
             ++part;
@@ -1029,7 +1029,8 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         }
         g_wab = g_wab_vectorial.get(0) * bodyforce[0] + g_wab_vectorial.get(1) * bodyforce[1] + g_wab_vectorial.get(2) * bodyforce[2];
 
-        double cand_pressure = (p_wab + g_wab) / kernel;
+        // double cand_pressure = (p_wab + g_wab) / kernel;
+        double cand_pressure = (p_wab) / kernel;
         double cand_density = rho_wab / kernel;
 
         vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;

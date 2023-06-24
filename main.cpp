@@ -56,12 +56,12 @@ int main(int argc, char *argv[])
         vd.getLastPos()[0] = fluid_it.get().get(0);
         vd.getLastPos()[1] = fluid_it.get().get(1);
         vd.getLastPos()[2] = fluid_it.get().get(2);
-        vd.getLastProp<x_pre>()[0] = vd.getLastPos()[0];
-        vd.getLastProp<x_pre>()[1] = vd.getLastPos()[1];
-        vd.getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+        vd.getLastProp<x_pre>()[0] = fluid_it.get().get(0);
+        vd.getLastProp<x_pre>()[1] = fluid_it.get().get(1);
+        vd.getLastProp<x_pre>()[2] = fluid_it.get().get(2);
         vd.template getLastProp<type>() = FLUID;
-        vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
-        vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
+        vd.template getLastProp<Pressure>() = 0     ;   //rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
+        vd.template getLastProp<rho>() = rho_zero   ;   //pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
         vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
         vd.template getLastProp<velocity>()[0] = 0.0;
         vd.template getLastProp<velocity>()[1] = 0.0;
@@ -113,9 +113,9 @@ int main(int argc, char *argv[])
             vd.getLastPos()[1] = toFill.get().get(1);
             vd.getLastPos()[2] = toFill.get().get(2);
 
-            vd.getLastProp<x_pre>()[0] = vd.getLastPos()[0];
-            vd.getLastProp<x_pre>()[1] = vd.getLastPos()[1];
-            vd.getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+            vd.getLastProp<x_pre>()[0] = toFill.get().get(0);;
+            vd.getLastProp<x_pre>()[1] = toFill.get().get(1);;
+            vd.getLastProp<x_pre>()[2] = toFill.get().get(2);;
 
             vd.template getLastProp<type>() = BOUNDARY;
             vd.template getLastProp<Pressure>() = 0;
