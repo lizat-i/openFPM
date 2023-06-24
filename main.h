@@ -4,11 +4,13 @@
 #include <math.h>
 #include "Draw/DrawParticles.hpp"
 #include <limits>
+#include <iostream>
+#include <fstream>
+std::ofstream outFile;
 // A constant to indicate boundary particles
 #define BOUNDARY 0
 // A constant to indicate fluid particles
 #define FLUID 1
-
 const double dp = 0.02;
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
@@ -84,6 +86,18 @@ const double kinematic_viscosity = 0.1;
 
 // velocity at previous step
 const double maxDensityVariation = 0.01;
+
+double Xmin = 0.0;
+double Ymin = 0.0;
+double Zmin = 0.0;
+
+double Xmax = 0.0;
+double Ymax = 0.0;
+double Zmax = 0.0;
+
+double L_x = 0.0;
+double L_y = 0.0;
+double L_z = 0.0;
 
 typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3]>> particles;
 //                                        |      |        |          |            |            |         |            |           |
@@ -260,7 +274,7 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                 Point<3, double> xb = vd.getPos(b);
                 Point<3, double> vb = vd.getProp<velocity>(b);
 
-                double pressure_b = vd.getProp<Pressure>(b);
+                double Pb = vd.getProp<Pressure>(b);
 
                 if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
                 {
@@ -283,7 +297,7 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                     double wab = Wab(r);
                     kernel += wab;
                     rho_wab += rhob * wab;
-                    p_wab += pressure_b * wab;
+                    p_wab += Pb * wab;
                     v_wab_vectorial += vb * wab;
                     g_wab_vectorial += wab * rhob * dr;
                     // Pressure and density calclation Boundary Particle
@@ -627,8 +641,14 @@ void stroemer_verlet_int(particles &vd, double dt)
         // if the particle is boundary
         if (vd.template getProp<type>(a) == BOUNDARY)
         {
+
             // Update rho
             double rhop = vd.template getProp<rho>(a);
+            // Update only the density
+            vd.template getProp<velocity>(a)[0] = 0.0;
+            vd.template getProp<velocity>(a)[1] = 0.0;
+            vd.template getProp<velocity>(a)[2] = 0.0;
+
             vd.template getProp<rho_prev>(a) = rhop;
             ++part;
             continue;
@@ -645,7 +665,8 @@ void stroemer_verlet_int(particles &vd, double dt)
 
         // integrate density
         double CandidateDensity = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
-        vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
+        // vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
+        vd.template getProp<rho>(a) = CandidateDensity;
 
         // save velocity_prev and rho_prev
         vd.template getProp<velocity_prev>(a)[0] = vd.template getProp<velocity>(a)[0];
@@ -681,15 +702,22 @@ void position_and_velocity_prediction(particles &vd, double dt)
         }
 
         // integrate velocity
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<pressure_force>(a)[0] + vd.template getProp<viscousFoces>(a)[0] + bodyforce[0]) * dt;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<pressure_force>(a)[1] + vd.template getProp<viscousFoces>(a)[1] + bodyforce[1]) * dt;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<pressure_force>(a)[2] + vd.template getProp<viscousFoces>(a)[2] + bodyforce[2]) * dt;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<pressure_force>(a)[0] + vd.template getProp<viscousFoces>(a)[0] + bodyforce[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<pressure_force>(a)[1] + vd.template getProp<viscousFoces>(a)[1] + bodyforce[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<pressure_force>(a)[2] + vd.template getProp<viscousFoces>(a)[2] + bodyforce[2]) * dt;
         // integrate position
-        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity>(a)[0]) * dt;
-        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity>(a)[1]) * dt;
-        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity>(a)[2]) * dt;
+        vd.getPos(a)[0] = vd.getPos(a)[0] + (vd.template getProp<velocity>(a)[0]) * dt;
+        vd.getPos(a)[1] = vd.getPos(a)[1] + (vd.template getProp<velocity>(a)[1]) * dt;
+        vd.getPos(a)[2] = vd.getPos(a)[2] + (vd.template getProp<velocity>(a)[2]) * dt;
 
         ++part;
+
+        if (vd.getPos(a)[0] < Xmin || vd.getPos(a)[1] < Ymin || vd.getPos(a)[2] < Zmin ||
+            vd.getPos(a)[0] > Xmax || vd.getPos(a)[1] > Ymax || vd.getPos(a)[2] > Zmax)
+        {
+            to_remove.add(a.getKey());
+            std::cout << "added to remove" << std::endl;
+        }
     }
 
     vd.remove(to_remove, 0);
@@ -756,7 +784,7 @@ inline void sensor_pressure(Vector &vd,
 }
 
 template <typename CellList>
-inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_visc, const double &dt, double &rho_error)
+inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_visc, const double &dt, double &errorGlobal)
 {
     auto part = vd.getDomainIterator();
     vd.updateCellList(NN);
@@ -786,6 +814,7 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
         double densityTerm2 = 0.0;
         double term_1 = 0.0;
         Point<3, double> term_2 = {0, 0, 0};
+        vd.getProp<rho>(a) = vd.getProp<rho_prev>(a);
 
         // For each neighborhood particle
         while (Np.isNext() == true)
@@ -815,28 +844,42 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
                 Point<3, double> DW;
                 DWab(dr, DW, r, false);
                 double wab = Wab(r);
-                kernel += wab;
+
                 // Desnsity Predicition Terms
                 double dotProdut_vrel_DW = v_rel.get(0) * DW.get(0) + v_rel.get(1) * DW.get(1) + v_rel.get(2) * DW.get(2);
                 double dotProdut_dr_DW = dr.get(0) * DW.get(0) + dr.get(1) * DW.get(1) + dr.get(2) * DW.get(2);
+
                 densityTerm1 += massb * dotProdut_vrel_DW;
-                densityTerm2 += visco * H * cbar * 2 * massb * (rhoa - rhob) / (rhob * (r2 + Eta2)) * dotProdut_dr_DW;
+                densityTerm2 += 2 * massb * (vd.getProp<rho>(a) - vd.getProp<rho>(b)) / (vd.getProp<rho>(b) * (r2 + Eta2)) * dotProdut_dr_DW;
+
+                // outFile << "density_averaging term " << 2 * massb * (vd.getProp<rho_prev>(a) - vd.getProp<rho_prev>(b)) / (vd.getProp<rho_prev>(b) * (r2 + Eta2)) << std::endl;
+                // outFile << "dotproductTerms  " <<dotProdut_dr_DW << std::endl;
 
                 // Desnsity Predicition Terms
-                term_1 += DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2);
-                term_2 += DW;
+                term_1 += massa * massb * DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2);
+                term_2 += massb * DW;
             }
             ++Np;
         }
-        vd.getProp<drho>(a) = densityTerm1 + densityTerm2;
+        // outFile << "densityTerm1 " << densityTerm1 << std::endl;
+        // outFile << "visco * H * cbar  " << visco * H * cbar * Eta2 << std::endl;
+        // outFile << "  densityTerm2 " << densityTerm2 << std::endl;
+
+        vd.getProp<drho>(a) = densityTerm1 + visco * H * cbar * densityTerm2;
         vd.getProp<rho>(a) = vd.getProp<rho_prev>(a) + vd.getProp<drho>(a) * dt;
 
         double rho_error = vd.getProp<rho>(a) - rho_zero;
-        rho_error = std::max(rho_error, rho_error);
+        double rho_error_normalized = rho_error / rho_zero;
+        errorGlobal = std::max(errorGlobal, rho_error_normalized);
 
-        double term_2_scalar = term_2.get(0)*term_2.get(0) + term_2.get(1)*term_2.get(1) + term_2.get(2)*term_2.get(2);
-        double K_i = (rho_zero * rho_zero) / (dt * dt * massa * massa);
-        K_i = K_i/ (term_1 + term_2_scalar);
+        double term_2_scalar = term_2.get(0) * term_2.get(0) + term_2.get(1) * term_2.get(1) + term_2.get(2) * term_2.get(2);
+        double beta = term_1 + term_2_scalar;
+
+        double dt2 = dt * dt;
+        double massa2 = massa * massa;
+        double rho_zero2 = rho_zero * rho_zero;
+
+        double K_i = rho_zero2 / dt2 / beta;
 
         double delptaP = K_i * rho_error;
         vd.getProp<Pressure>(a) += delptaP;
@@ -850,12 +893,8 @@ inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
 {
     auto part = vd.getDomainIterator();
 
-    // Update the cell-list
-    // std::cout << "exit updateCellList" << std::endl;
     vd.updateCellList(NN);
-    // std::cout << "exit updateCellList" << std::endl;
 
-    // For each particle ...
     while (part.isNext())
     {
         // ... a
@@ -867,9 +906,8 @@ inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
         double Pa = vd.getProp<Pressure>(a);
-        vd.template getProp<drho>(a) = 0.0;
 
-        if (vd.getProp<type>(a) != BOUNDARY)
+        if (vd.getProp<type>(a) != FLUID)
         {
             ++part;
             continue;
@@ -914,6 +952,92 @@ inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
             ++Np;
         }
 
+        ++part;
+    }
+}
+template <typename CellList>
+inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
+{
+    auto part = vd.getDomainIterator();
+    vd.updateCellList(NN);
+
+    while (part.isNext())
+    {
+        auto a = part.get();
+
+        Point<3, double> xa = vd.getPos(a);
+        Point<3, double> va = vd.getProp<velocity>(a);
+
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
+        double rhoa = vd.getProp<rho>(a);
+        double Pa = vd.getProp<Pressure>(a);
+
+        if (vd.getProp<type>(a) != BOUNDARY)
+        {
+            ++part;
+            continue;
+        }
+        auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
+        double kernel = 0;
+        double rho_wab = 0;
+        double p_wab = 0;
+        double g_wab = 0;
+        double v_wab = 0;
+
+        Point<3, double> g_wab_vectorial = {0, 0, 0};
+        Point<3, double> v_wab_vectorial = {0, 0, 0};
+        // For each neighborhood particle
+        while (Np.isNext() == true)
+        {
+            // ... q
+            auto b = Np.get();
+
+            Point<3, double> xb = vd.getPos(b);
+            Point<3, double> vb = vd.getProp<velocity>(b);
+
+            double Pb = vd.getProp<Pressure>(b);
+
+            if (a.getKey() == b || vd.getProp<type>(b) != FLUID)
+            {
+                ++Np;
+                continue;
+            };
+
+            // get the mass of the particle
+            double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+            double rhob = vd.getProp<rho>(b);
+            Point<3, double> dr = xa - xb;
+
+            double r2 = norm2(dr);
+            double r = sqrt(r2);
+
+            // If the particles interact ...
+            if (r < smoothingRadius)
+            {
+
+                double wab = Wab(r);
+                kernel += wab;
+                rho_wab += rhob * wab;
+                p_wab += Pb * wab;
+                v_wab_vectorial += vb * wab;
+                g_wab_vectorial += wab * rhob * dr;
+                // Pressure and density calclation Boundary Particle
+            }
+
+            ++Np;
+        }
+        g_wab = g_wab_vectorial.get(0) * bodyforce[0] + g_wab_vectorial.get(1) * bodyforce[1] + g_wab_vectorial.get(2) * bodyforce[2];
+
+        double cand_pressure = (p_wab + g_wab) / kernel;
+        double cand_density = rho_wab / kernel;
+
+        vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
+        vd.getProp<Pressure>(a) = (kernel > 0.0) ? cand_pressure : 0.0;
+        // vd.getProp<Pressure>(a) = cand_pressure ;
+
+        vd.template getProp<velocity>(a)[0] = (kernel > 0.0) ? -v_wab_vectorial[0] / kernel : 0;
+        vd.template getProp<velocity>(a)[1] = (kernel > 0.0) ? -v_wab_vectorial[1] / kernel : 0;
+        vd.template getProp<velocity>(a)[2] = (kernel > 0.0) ? -v_wab_vectorial[2] / kernel : 0;
         ++part;
     }
 }

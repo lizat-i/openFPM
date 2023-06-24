@@ -3,23 +3,27 @@
 
 int main(int argc, char *argv[])
 {
+
+    // std::ofstream outFile;
+    outFile.open("logfile.txt", std::ios_base::app);
+
     // initialize the library
     openfpm_init(&argc, &argv);
     // It contain for each time-step the value detected by the probes
     openfpm::vector<openfpm::vector<double>> press_t;
     openfpm::vector<Point<3, double>> probes;
 
-    double Xmin = 0 - 3 * dp;
-    double Ymin = 0 - 3 * dp;
-    double Zmin = 0 - 3 * dp;
+    Xmin = 0 - 3 * dp;
+    Ymin = 0 - 3 * dp;
+    Zmin = 0 - 3 * dp;
 
-    double Xmax = 1.6 + 3 * dp;
-    double Ymax = 0.67 + 3 * dp;
-    double Zmax = 0.45;
+    Xmax = 1.6 + 3 * dp;
+    Ymax = 0.67 + 3 * dp;
+    Zmax = 0.45;
 
-    double L_x = Xmax - Xmin;
-    double L_y = Ymax - Ymin;
-    double L_z = Zmax - Zmin;
+    L_x = Xmax - Xmin;
+    L_y = Ymax - Ymin;
+    L_z = Zmax - Zmin;
 
     size_t Nr_x = ceil(L_x / dp);
     size_t Nr_y = ceil(L_y / dp);
@@ -42,6 +46,8 @@ int main(int argc, char *argv[])
     h_swl = fluid_it.getBoxMargins().getHigh(2) - fluid_it.getBoxMargins().getLow(2);
     B = (coeff_sound) * (coeff_sound)*gravity * h_swl * rho_zero / gamma_;
     cbar = coeff_sound * sqrt(gravity * h_swl);
+    cbar = 3.0 *10 ; 
+    std::cout<<cbar<< std::endl;
 
     int NrOfFluidParticles = 0;
     while (fluid_it.isNext())
@@ -50,7 +56,9 @@ int main(int argc, char *argv[])
         vd.getLastPos()[0] = fluid_it.get().get(0);
         vd.getLastPos()[1] = fluid_it.get().get(1);
         vd.getLastPos()[2] = fluid_it.get().get(2);
-
+        vd.getLastProp<x_pre>()[0] = vd.getLastPos()[0];
+        vd.getLastProp<x_pre>()[1] = vd.getLastPos()[1];
+        vd.getLastProp<x_pre>()[2] = vd.getLastPos()[2];
         vd.template getLastProp<type>() = FLUID;
         vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
         vd.template getLastProp<rho>() = pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
@@ -105,8 +113,14 @@ int main(int argc, char *argv[])
             vd.getLastPos()[1] = toFill.get().get(1);
             vd.getLastPos()[2] = toFill.get().get(2);
 
+            vd.getLastProp<x_pre>()[0] = vd.getLastPos()[0];
+            vd.getLastProp<x_pre>()[1] = vd.getLastPos()[1];
+            vd.getLastProp<x_pre>()[2] = vd.getLastPos()[2];
+
             vd.template getLastProp<type>() = BOUNDARY;
+            vd.template getLastProp<Pressure>() = 0;
             vd.template getLastProp<rho>() = rho_zero;
+
             vd.template getLastProp<rho_prev>() = rho_zero;
             vd.template getLastProp<velocity>()[0] = 0.0;
             vd.template getLastProp<velocity>()[1] = 0.0;
@@ -123,7 +137,6 @@ int main(int argc, char *argv[])
             ++toFill;
         }
     }
-
     // std::cout << "exit drawing box" << '\n';
     vd.map();
     vd.write_frame("output/Geometry", 0);
@@ -167,26 +180,38 @@ int main(int argc, char *argv[])
 
         while (densityError > maxDensityVariation || iterCount < 3)
         {
-            double densityError = 0.0;
+            densityError = 0.0;
+
             position_and_velocity_prediction(vd, dt);
+            vd.map();
             vd.ghost_get<type, rho, Pressure, velocity>();
+            vd.updateCellList(NN);
+
             predictDensityAndUpdate(vd, NN, max_visc, dt, densityError);
+            // outFile << "enterExBoun " << iterCount << std::endl;
+            extrapolateBoundaries(vd, NN, max_visc);
+            // outFile << "entercalcPre " << iterCount << std::endl;
             calc_Pressure_forces(vd, NN, max_visc);
 
-            std::cout << "density iteration = " << iterCount << std::endl;
-            std::cout << "density Error = " << densityError << std::endl;
-
             v_cl.max(max_visc);
-            v_cl.execute();
             v_cl.max(densityError);
             v_cl.execute();
+
+            // v_cl.max(densityError);
+            // v_cl.execute();
+
             ++iterCount;
         }
+        if (v_cl.getProcessUnitID() == 0)
+        {
+            outFile << "it " << iterCount << std::endl;
+        }
+
         it++;
         write_coounter++;
         stroemer_verlet_int(vd, dt);
         t += dt;
-        if (write_coounter % 100 == 0)
+        if (write_coounter % 1 == 0)
         {
             // sensor_pressure calculation require ghost and update cell-list
             vd.map();
