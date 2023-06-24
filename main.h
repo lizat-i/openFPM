@@ -818,6 +818,7 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
         double pressureNeighbouring = 0.0;
         double term_1 = 0.0;
         Point<3, double> term_2 = {0, 0, 0};
+        Point<3, double> term_3 = {0, 0, 0};
         vd.getProp<rho>(a) = vd.getProp<rho_prev>(a);
 
         // For each neighborhood particle
@@ -860,8 +861,9 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
                 // outFile << "dotproductTerms  " <<dotProdut_dr_DW << std::endl;
 
                 // Desnsity Predicition Terms
-                term_1 +=  DW.get(0) * DW.get(0) + DW.get(1) * DW.get(1) + DW.get(2) * DW.get(2);
-                term_2 +=  DW;
+                term_1 +=  norm2(dr);
+                term_2 += DW;
+                // term_3 += massb / rhob * DW;
 
                 pressureNeighbouring += massb / rhob * Pb * wab;
             }
@@ -878,13 +880,14 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
         double rho_error_normalized = rho_error / rho_zero;
         errorGlobal = std::max(errorGlobal, rho_error_normalized);
 
-        double term_2_scalar = term_2.get(0) * term_2.get(0) + term_2.get(1) * term_2.get(1) + term_2.get(2) * term_2.get(2);
-        double beta = term_1 + term_2_scalar;
+        // double term_2_scalar = term_2.get(0) * term_3.get(0) + term_2.get(1) * term_3.get(1) + term_2.get(2) * term_3.get(2);
+        double term_2_scalar = norm2(term_2);
 
+        double beta = massa * term_1 + term_2_scalar;
         double dt2 = dt * dt;
         double massa2 = massa * massa;
         double rho_zero2 = rho_zero * rho_zero;
-        double K_i = rho_zero2/ (massa2 * dt2 *beta);
+        double K_i = rhoa / dt2 / beta;
 
         double delptaP = K_i * rho_error;
 
@@ -975,8 +978,11 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
     {
         auto a = part.get();
 
-        Point<3, double> xa = vd.getPos(a);
-        Point<3, double> va = vd.getProp<velocity>(a);
+        // Point<3, double> xa = vd.getPos(a);
+        // Point<3, double> va = vd.getProp<velocity>(a);
+
+        Point<3, double> xa = vd.getProp<x_pre>(a);
+        Point<3, double> va = vd.getProp<velocity_prev>(a);
 
         double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
         double rhoa = vd.getProp<rho>(a);
@@ -1004,6 +1010,9 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 
             Point<3, double> xb = vd.getPos(b);
             Point<3, double> vb = vd.getProp<velocity>(b);
+
+            Point<3, double> xa = vd.getProp<x_pre>(b);
+            Point<3, double> va = vd.getProp<velocity_prev>(b);
 
             double Pb = vd.getProp<Pressure>(b);
 
@@ -1039,7 +1048,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         g_wab = g_wab_vectorial.get(0) * bodyforce[0] + g_wab_vectorial.get(1) * bodyforce[1] + g_wab_vectorial.get(2) * bodyforce[2];
 
         double cand_pressure = (p_wab + g_wab) / kernel;
-        //double cand_pressure = (p_wab) / kernel;
+        // double cand_pressure = (p_wab) / kernel;
         double cand_density = rho_wab / kernel;
 
         vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
