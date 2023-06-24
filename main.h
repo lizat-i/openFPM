@@ -648,6 +648,7 @@ void stroemer_verlet_int(particles &vd, double dt)
             vd.template getProp<velocity>(a)[0] = 0.0;
             vd.template getProp<velocity>(a)[1] = 0.0;
             vd.template getProp<velocity>(a)[2] = 0.0;
+            vd.template getProp<Pressure>(a)[2] = 0.0;
 
             vd.template getProp<rho_prev>(a) = rhop;
             ++part;
