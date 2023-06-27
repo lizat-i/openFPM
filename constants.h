@@ -80,9 +80,11 @@ const int velocity_prev = 7;
 const int viscous_acc = 8;
 // position at previous timestep
 const int x_pre = 9;
+// position at previous timestep
+const int rho_err = 10;
 // Gravity or external forces
 const double bodyforce[3] = {0, 0, -gravity};
- 
+
 // maximum allowed density error
 const double maxDensityVariation = 0.01;
 

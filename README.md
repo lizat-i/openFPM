@@ -24,17 +24,6 @@ It runs everything inside a docker container.
 #5 ./install && sudo make install 
 #6 follow installation instruction
 
-# how to get it running, first time setup:
-this repo contains a 
-.vscode and .devcontainer file.
-It runs everything inside a docker container.
-
-#1 docker pull openfpm/ubuntu:install20.04
-#2 open vscode from within PCISPH folder 
-#3 open inside Dev Container 
-#4 cd /openfpm/openfpm_pdata
-#5 ./install && sudo make install 
-#6 follow installation instruction
 
 # Compilation and run simulation 
 

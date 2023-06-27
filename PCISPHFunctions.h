@@ -107,7 +107,7 @@ void position_and_velocity_prediction(particles &vd, double dt)
 
         /*
 
-        Predict velocity and Owerwrite velocity for 
+        Predict velocity and Owerwrite velocity for
         ALL consecutive Calcuations.
         from here on velocity is v*
         and position is x*
@@ -116,20 +116,20 @@ void position_and_velocity_prediction(particles &vd, double dt)
         during integration step.
 
         when finishing iteration
-        v* and x* are again calculated 
+        v* and x* are again calculated
         from starting Point velocity_prev, and x_prev
 
         did I understand this correctly?
 
-        */ 
+        */
 
-       // predict velocity
+        // predict velocity
 
         vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt;
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<pressure_acc>(a)[1] + vd.template getProp<viscous_acc>(a)[1] + bodyforce[1]) * dt;
         vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<pressure_acc>(a)[2] + vd.template getProp<viscous_acc>(a)[2] + bodyforce[2]) * dt;
-      
-       // predict position
+
+        // predict position
 
         vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity>(a)[0]) * dt;
         vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity>(a)[1]) * dt;
@@ -156,7 +156,7 @@ void position_and_velocity_prediction(particles &vd, double dt)
 }
 
 template <typename CellList>
-inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_visc, const double &dt, double &errorGlobal)
+inline void predictDensity(particles &vd, CellList &NN, double &max_visc, const double &dt, double &errorGlobal)
 {
     /*
      paralelization housekeeping
@@ -189,7 +189,115 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
 
         // Initialize quantities for summation in loop
         Point<3, double> gradientSum_1 = {0, 0, 0};
-        Point<3, double> gradientSum_2 = {0, 0, 0};
+        Point<3, double> gradientSum = {0, 0, 0};
+        Point<3, double> drScaled = {0, 0, 0};
+
+        double kernel = 0;
+        double densitySumation = 0.0;
+        double densityDiffusionTerm = 0.0;
+        double pressureNeighbouring = 0.0;
+        double sumSquaredGradient = 0.0;
+
+        vd.getProp<drho>(a) = 0.0;
+
+        // get Neighborhood of particle
+        auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
+        // For each neighborhood particle
+        while (Np.isNext() == true)
+        {
+            // ... q
+            auto b = Np.get();
+            // Skip the iteration if particle a=b
+
+            if (a.getKey() == b)
+            {
+                ++Np;
+                continue;
+            };
+
+            // Get particle properties b
+
+            Point<3, double> xb = vd.getPos(b);
+            Point<3, double> vb = vd.getProp<velocity>(b);
+
+            double Pb = vd.getProp<Pressure>(b);
+            double rhob = vd.getProp<rho>(b);
+            double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
+
+            // calculate quantities
+            Point<3, double> dr = xa - xb;
+            Point<3, double> v_rel = va - vb;
+            Point<3, double> DW;
+
+            double r2 = norm2(dr);
+            double r = sqrt(r2);
+            DWab(dr, DW, r, false);
+            double wab = Wab(r);
+
+            // If the particles interact ...
+            if (r < smoothingRadius)
+            {
+                // Density pediction
+                // Desnsity sumation
+                double dot_vrel_DW = dotProduct(v_rel, DW);
+                densitySumation += massb * dot_vrel_DW;
+
+                // Desnsity diffusion
+                drScaled = 2 * massb * (vd.getProp<rho_prev>(a) - vd.getProp<rho_prev>(b)) / (vd.getProp<rho_prev>(b) * (r2 + Eta2)) * dr;
+                densityDiffusionTerm += dotProduct(drScaled, DW);
+            }
+            ++Np;
+        }
+
+        // Density pediction
+        vd.getProp<drho>(a) = densitySumation + visco * H * cbar * densityDiffusionTerm;
+        vd.getProp<rho>(a) = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
+
+        // Density error calculation and tracking
+
+        double rho_error = vd.getProp<rho>(a) - rho_zero;
+        double rho_error_normalized = rho_error / rho_zero;
+        errorGlobal = std::max(errorGlobal, rho_error_normalized);
+        vd.getProp<rho_err>(a) = rho_error;
+        ++part;
+    }
+}
+
+template <typename CellList>
+inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const double &dt, double &errorGlobal)
+{
+    /*
+     paralelization housekeeping
+     currently irrelevant
+     because testing with one processor
+   */
+    vd.map();
+    vd.ghost_get<>();
+    vd.updateCellList(NN);
+    auto part = vd.getDomainIterator();
+
+    while (part.isNext())
+    {
+        auto a = part.get();
+
+        // skip boundaryParticles
+        if (vd.getProp<type>(a) == BOUNDARY)
+        {
+            ++part;
+            continue;
+        };
+
+        // Get particle properties a
+        Point<3, double> xa = vd.getPos(a);
+        Point<3, double> va = vd.getProp<velocity>(a);
+
+        double massa = (vd.getProp<type>(a) == FLUID) ? MassFluid : MassBound;
+        double rhoa = vd.getProp<rho>(a);
+        double Pa = vd.getProp<Pressure>(a);
+
+        // Initialize quantities for summation in loop
+        Point<3, double> gradientSum_1 = {0, 0, 0};
+        Point<3, double> gradientSum = {0, 0, 0};
         Point<3, double> drScaled = {0, 0, 0};
 
         double kernel = 0;
@@ -247,43 +355,26 @@ inline void predictDensityAndUpdate(particles &vd, CellList &NN, double &max_vis
                 densityDiffusionTerm += dotProduct(drScaled, DW);
 
                 // PressureCoefficient Summation Terms
-                sumSquaredGradient += massb / rhob * dotProduct(DW, DW);
-                gradientSum_1 += massb / rhob * DW;
-                gradientSum_2 += massb * DW;
+                sumSquaredGradient += massa*massb * dotProduct(DW, DW);
+                gradientSum += massb * DW;
 
                 // Pressure Smoothing
                 pressureNeighbouring += massb / rhob * Pb * wab;
             }
             ++Np;
         }
-        // outFile << "densitySumation " << densitySumation << std::endl;
-        // outFile << "visco * H * cbar  " << visco * H * cbar * Eta2 << std::endl;
-        // outFile << "  densityDiffusionTerm " << densityDiffusionTerm << std::endl;
+        // Pressure calculation
 
-        // Density pediction
-        vd.getProp<drho>(a) = densitySumation + visco * H * cbar * densityDiffusionTerm;
-        vd.getProp<rho>(a) = vd.getProp<rho>(a) + vd.getProp<drho>(a) * dt;
-
-        // Density error calculation and tracking
-
-        double rho_error = vd.getProp<rho>(a) - rho_zero;
-        double rho_error_normalized = rho_error / rho_zero;
-        errorGlobal = std::max(errorGlobal, rho_error_normalized);
-
-        // Pressure calcilation
-
-        double beta = dotProduct(gradientSum_1, gradientSum_2) + massa * sumSquaredGradient;
-        double delptaP = (rhoa * rho_error) / (dt * dt * beta);
+        double beta = dotProduct(gradientSum, gradientSum) + sumSquaredGradient;
+        double delptaP = (rhoa * vd.getProp<rho_err>(a)) / (dt * dt * beta);
         double predicted_Pressure = vd.getProp<Pressure>(a) + delptaP;
         // pressure Smoothing
         double smoothedPressure = predicted_Pressure * intPConst + (1 - intPConst) * pressureNeighbouring;
-
         vd.getProp<Pressure>(a) = smoothedPressure;
 
         ++part;
     }
 }
-
 template <typename CellList>
 inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
 {

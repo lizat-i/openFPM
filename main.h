@@ -8,7 +8,7 @@
 #include <fstream>
 #include "constants.h"
 
-typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3]>> particles;
+typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3],double>> particles;
 //                                        |      |        |          |            |            |         |            |           |
 //                                        |      |        |          |            |            |         |            |           |
 //                                      type   density   density    Pressure    delta       force      velocity    velocity    position
@@ -514,7 +514,7 @@ inline void sensor_pressure(Vector &vd,
 }
 
 template <typename CellList>
-inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt, double &max_visc , int &iterCount,  double &t)
+inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt, double &max_visc, int &iterCount, double &t)
 {
     Vcluster<> &v_cl = create_vcluster();
     auto part = vd.getDomainIterator();
@@ -538,7 +538,7 @@ inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt,
 
         if (v_cl.getProcessUnitID() == 0)
         {
-            std::cout << "TIME: " << t << "process unit "<< v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
+            std::cout << "TIME: " << t << "process unit " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
         }
     }
 }
@@ -602,6 +602,7 @@ inline particles setUpDomain()
         vd.template getLastProp<velocity_prev>()[0] = 0.0;
         vd.template getLastProp<velocity_prev>()[1] = 0.0;
         vd.template getLastProp<velocity_prev>()[2] = 0.0;
+        vd.template getLastProp<rho_err>() = 0.0;
 
         // vd.template getLastProp<viscous_acc>()[0] = 0.0;
         // vd.template getLastProp<viscous_acc>()[1] = 0.0;
@@ -647,11 +648,8 @@ inline particles setUpDomain()
             vd.getLastPos()[2] = toFill.get().get(2);
 
             vd.getLastProp<x_pre>()[0] = toFill.get().get(0);
-            ;
             vd.getLastProp<x_pre>()[1] = toFill.get().get(1);
-            ;
             vd.getLastProp<x_pre>()[2] = toFill.get().get(2);
-            ;
 
             vd.template getLastProp<type>() = BOUNDARY;
             vd.template getLastProp<Pressure>() = 0;
@@ -665,7 +663,7 @@ inline particles setUpDomain()
             vd.template getLastProp<velocity_prev>()[0] = 0.0;
             vd.template getLastProp<velocity_prev>()[1] = 0.0;
             vd.template getLastProp<velocity_prev>()[2] = 0.0;
-
+            vd.template getLastProp<rho_err>() = 0.0;
             // vd.template getLastProp<viscous_acc>()[0] = 0.0;
             // vd.template getLastProp<viscous_acc>()[1] = 0.0;
             // vd.template getLastProp<viscous_acc>()[2] = 0.0;
@@ -676,7 +674,8 @@ inline particles setUpDomain()
 
     return vd;
 }
-inline double dotProduct(Point<3, double> &a,Point<3, double> &b){
+inline double dotProduct(Point<3, double> &a, Point<3, double> &b)
+{
 
-    return a.get(0)*b.get(0) + a.get(1)*b.get(1) + a.get(2)*b.get(2);
+    return a.get(0) * b.get(0) + a.get(1) * b.get(1) + a.get(2) * b.get(2);
 }

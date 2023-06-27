@@ -20,12 +20,11 @@ int main(int argc, char *argv[])
     vd.ghost_get<>();
     auto NN = vd.getCellList(2 * H);
 
-
     // Inti
     size_t write = 1;
     size_t it = 0;
     double t = 0.0;
-    
+
     while (t <= t_end)
     {
         Vcluster<> &v_cl = create_vcluster();
@@ -46,7 +45,8 @@ int main(int argc, char *argv[])
             densityError = 0.0;
 
             position_and_velocity_prediction(vd, dt);
-            predictDensityAndUpdate(vd, NN, max_visc, dt, densityError);
+            predictDensity(vd, NN, max_visc, dt, densityError);
+            predictPressure(vd, NN, max_visc, dt, densityError);
             extrapolateBoundaries(vd, NN, max_visc);
             calc_Pressure_forces(vd, NN, max_visc);
 
@@ -61,8 +61,7 @@ int main(int argc, char *argv[])
         t += dt;
         it++;
 
-
-        printAndLog(vd, NN, write, cnt, max_visc,  iterCount,  t);
+        printAndLog(vd, NN, write, cnt, max_visc, iterCount, t);
     }
     openfpm_finalize();
 }
