@@ -10,9 +10,9 @@ int main(int argc, char *argv[])
 
     // initialize the library
     openfpm_init(&argc, &argv);
-    // setup domain, map paricles and ghet ghost properties
+    // setup domain
     particles vd = setUpDomain();
-    // Decompose domain
+    // Decompose domain, map paricles and ghet ghost properties
     vd.map();
     vd.write_frame("output/Geometry", 0);
     vd.getDecomposition().decompose();
@@ -20,18 +20,15 @@ int main(int argc, char *argv[])
     vd.ghost_get<>();
     auto NN = vd.getCellList(2 * H);
 
-    
-    // Evolve
-    size_t write_coounter = 1;
+
+    // Inti
     size_t write = 1;
     size_t it = 0;
-    size_t it_reb = 0;
     double t = 0.0;
+    
     while (t <= t_end)
     {
         Vcluster<> &v_cl = create_vcluster();
-        timer it_time;
-
 
         vd.map();
         vd.template ghost_get<>();
@@ -62,11 +59,10 @@ int main(int argc, char *argv[])
 
         stroemer_verlet_int(vd, dt);
         t += dt;
-
         it++;
-        write_coounter++;
 
-        printAndLog(vd, NN, write, cnt, max_visc, it_time, iterCount, write_coounter,  t);
+
+        printAndLog(vd, NN, write, cnt, max_visc,  iterCount,  t);
     }
     openfpm_finalize();
 }

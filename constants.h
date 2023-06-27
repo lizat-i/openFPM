@@ -70,25 +70,23 @@ const int rho_prev = 2;
 const int Pressure = 3;
 // Delta rho calculated in the force calculation
 const int drho = 4;
-// calculated force
-const int pressure_force = 5;
+// calculated pressure Force
+const int pressure_acc = 5;
 // velocity
 const int velocity = 6;
 // velocity at previous step
 const int velocity_prev = 7;
-// Type of the vector containing particles
-const int viscousFoces = 8;
-// Type of the vector containing particles
+// calculated viscous Force
+const int viscous_acc = 8;
+// position at previous timestep
 const int x_pre = 9;
-
-// Type of the vector containing particles
+// Gravity or external forces
 const double bodyforce[3] = {0, 0, -gravity};
-// velocity at previous step
-const double kinematic_viscosity = 0.1;
-// velocity at previous step
+ 
+// maximum allowed density error
 const double maxDensityVariation = 0.01;
 
-// velocity at previous step
+// smoothing parameter
 const double intPConst = 0.5;
 
 double Xmin = 0.0;
