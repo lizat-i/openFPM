@@ -8,7 +8,7 @@
 #include <fstream>
 #include "constants.h"
 
-typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3],double>> particles;
+typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3], double>> particles;
 //                                        |      |        |          |            |            |         |            |           |
 //                                        |      |        |          |            |            |         |            |           |
 //                                      type   density   density    Pressure    delta       force      velocity    velocity    position
@@ -514,19 +514,17 @@ inline void sensor_pressure(Vector &vd,
 }
 
 template <typename CellList>
-inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt, double &max_visc, int &iterCount, double &t)
+inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt, double &max_visc, int &pcisphIt, double &t, size_t it_reb, size_t nr_timestep)
 {
     Vcluster<> &v_cl = create_vcluster();
     auto part = vd.getDomainIterator();
 
-    vd.updateCellList(NN);
-
     // Log Itercount Print other stuff
     if (v_cl.getProcessUnitID() == 0)
     {
-        outFile << "it " << iterCount << std::endl;
+        outFile << "pcisphIt :  " << pcisphIt << std::endl;
     }
-    if (iterCount % 1 == 0)
+    if (nr_timestep % 5 == 0)
     {
         // sensor_pressure calculation require ghost and update cell-list
         vd.map();
@@ -538,7 +536,7 @@ inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt,
 
         if (v_cl.getProcessUnitID() == 0)
         {
-            std::cout << "TIME: " << t << "process unit " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
+            std::cout << "TIME: " << t << " process unit " << v_cl.getProcessUnitID() << "   " << cnt << "   Max visc: " << max_visc << std::endl;
         }
     }
 }

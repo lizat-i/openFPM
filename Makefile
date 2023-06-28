@@ -25,7 +25,7 @@ sph_dlb: $(OBJ)
 all: sph_dlb
 
 run: sph_dlb_test
-	mpirun --allow-run-as-root --oversubscribe -np 1 ./sph_dlb
+	mpirun --allow-run-as-root --oversubscribe -np 4 ./sph_dlb
 
 .PHONY: clean all run
 

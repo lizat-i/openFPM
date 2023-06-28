@@ -90,9 +90,14 @@ inline void Init_Loop(particles &vd, CellList &NN, double &max_visc)
     }
 }
 
-void position_and_velocity_prediction(particles &vd, double dt)
+template <typename CellList>
+void position_and_velocity_prediction(particles &vd, CellList &NN, double dt)
 {
     auto part = vd.getDomainIterator();
+
+    vd.map();
+    vd.ghost_get<rho, velocity, rho_prev, x_pre, velocity_prev>();
+    vd.updateCellList(NN);
 
     while (part.isNext())
     {
@@ -147,7 +152,7 @@ void position_and_velocity_prediction(particles &vd, double dt)
             vd.getPos(a)[0] > Xmax || vd.getPos(a)[1] > Ymax || vd.getPos(a)[2] > Zmax)
         {
             to_remove.add(a.getKey());
-            std::cout << "added to remove" << std::endl;
+            outFile << "added to remove :  " << std::endl;
         }
     }
 
@@ -164,8 +169,9 @@ inline void predictDensity(particles &vd, CellList &NN, double &max_visc, const 
      because testing with one processor
    */
     vd.map();
-    vd.ghost_get<>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
     vd.updateCellList(NN);
+
     auto part = vd.getDomainIterator();
 
     while (part.isNext())
@@ -243,7 +249,8 @@ inline void predictDensity(particles &vd, CellList &NN, double &max_visc, const 
                 densitySumation += massb * dot_vrel_DW;
 
                 // Desnsity diffusion
-                drScaled = 2 * massb * (vd.getProp<rho_prev>(a) - vd.getProp<rho_prev>(b)) / (vd.getProp<rho_prev>(b) * (r2 + Eta2)) * dr;
+                // drScaled = 2 * massb * (vd.getProp<rho_prev>(a) - vd.getProp<rho_prev>(b)) / (vd.getProp<rho_prev>(b) * (r2 + Eta2)) * dr;
+                drScaled = 2 * massb * (rhoa - rhob) / (rhob * (r2 + Eta2)) * dr;
                 densityDiffusionTerm += dotProduct(drScaled, DW);
             }
             ++Np;
@@ -271,9 +278,9 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
      currently irrelevant
      because testing with one processor
    */
-    vd.map();
-    vd.ghost_get<>();
-    vd.updateCellList(NN);
+
+    vd.ghost_get<rho>();
+
     auto part = vd.getDomainIterator();
 
     while (part.isNext())
@@ -305,8 +312,6 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
         double densityDiffusionTerm = 0.0;
         double pressureNeighbouring = 0.0;
         double sumSquaredGradient = 0.0;
-
-        vd.getProp<drho>(a) = 0.0;
 
         // get Neighborhood of particle
         auto Np = NN.template getNNIterator<NO_CHECK>(NN.getCell(vd.getPos(a)));
@@ -355,7 +360,7 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
                 densityDiffusionTerm += dotProduct(drScaled, DW);
 
                 // PressureCoefficient Summation Terms
-                sumSquaredGradient += massa*massb * dotProduct(DW, DW);
+                sumSquaredGradient += massa * massb * dotProduct(DW, DW);
                 gradientSum += massb * DW;
 
                 // Pressure Smoothing
@@ -375,11 +380,52 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
         ++part;
     }
 }
+
+template <typename CellList>
+inline void resetPosVelDen(particles &vd, CellList &NN)
+{
+    auto part = vd.getDomainIterator();
+    vd.ghost_get<Pressure>();
+
+    while (part.isNext())
+    {
+
+        auto a = part.get();
+
+        // skip boundary particles
+        if (vd.getProp<type>(a) == BOUNDARY)
+        {
+            ++part;
+            continue;
+        };
+
+        // Get particle properties a
+
+        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0];
+        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1];
+        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2];
+
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0];
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1];
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2];
+
+        vd.getProp<rho>(a) = vd.getProp<rho_prev>(a);
+
+        ++part;
+    }
+
+    vd.updateCellList(NN);
+    vd.map();
+    vd.ghost_get<rho, velocity>(WITH_POSITION);
+    vd.map();
+}
+
 template <typename CellList>
 inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
 {
+    vd.ghost_get<rho, Pressure, velocity>();
+
     auto part = vd.getDomainIterator();
-    vd.updateCellList(NN);
 
     while (part.isNext())
     {
@@ -448,6 +494,9 @@ template <typename CellList>
 inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 {
     auto part = vd.getDomainIterator();
+
+    vd.map();
+    vd.ghost_get<type, rho, Pressure, velocity>();
     vd.updateCellList(NN);
 
     while (part.isNext())
@@ -497,6 +546,9 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
             Point<3, double> xb = vd.getPos(b);
             Point<3, double> vb = vd.getProp<velocity>(b);
 
+            // Point<3, double> xb = vd.getProp<x_pre>(b);
+            // Point<3, double> vb = vd.getProp<velocity_prev>(b);
+
             double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
             double Pb = vd.getProp<Pressure>(b);
             double rhob = vd.getProp<rho>(b);
@@ -530,8 +582,10 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         g_wab = rho_dr_wf.get(0) * bodyforce[0] + rho_dr_wf.get(1) * bodyforce[1] + rho_dr_wf.get(2) * bodyforce[2];
         // calculate candidate pressure
         double cand_pressure = (p_wab + g_wab) / kernel;
-        // if kernel empty set pressure zero, otherwise cand pressure
-        vd.getProp<Pressure>(a) = (kernel > 0.0) ? cand_pressure : 0.0;
+        // double cand_pressure = (p_wab) / kernel;
+        //  if kernel empty set pressure zero, otherwise cand pressure
+        //  TODO Boundary Pressure wird hier geklippt
+        vd.getProp<Pressure>(a) = (cand_pressure > 0.0) ? cand_pressure : 0.0;
 
         // calculate extrapolated densities
         double cand_density = rho_wab / kernel;
@@ -549,6 +603,8 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 
 void stroemer_verlet_int(particles &vd, double dt)
 {
+    vd.ghost_get<pressure_acc>();
+    
     // list of the particle to remove
     to_remove.clear();
     // particle iterator
