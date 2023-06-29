@@ -215,11 +215,11 @@ inline void predictDensity(particles &vd, CellList &NN, double &max_visc, const 
             auto b = Np.get();
             // Skip the iteration if particle a=b
 
-            if (a.getKey() == b)
-            {
-                ++Np;
-                continue;
-            };
+            // if (a.getKey() == b)
+            // {
+            //     ++Np;
+            //     continue;
+            // };
 
             // Get particle properties b
 
@@ -322,11 +322,11 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
             auto b = Np.get();
             // Skip the iteration if particle a=b
 
-            if (a.getKey() == b)
-            {
-                ++Np;
-                continue;
-            };
+            // if (a.getKey() == b)
+            // {
+            //     ++Np;
+            //     continue;
+            // };
 
             // Get particle properties b
 
@@ -350,15 +350,6 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
             // If the particles interact ...
             if (r < smoothingRadius)
             {
-                // Density pediction
-                // Desnsity sumation
-                double dot_vrel_DW = dotProduct(v_rel, DW);
-                densitySumation += massb * dot_vrel_DW;
-
-                // Desnsity diffusion
-                drScaled = 2 * massb * (vd.getProp<rho_prev>(a) + vd.getProp<rho_prev>(b)) / (vd.getProp<rho_prev>(b) * (r2 + Eta2)) * dr;
-                densityDiffusionTerm += dotProduct(drScaled, DW);
-
                 // PressureCoefficient Summation Terms
                 sumSquaredGradient += massa * massb * dotProduct(DW, DW);
                 gradientSum += massb * DW;
@@ -458,11 +449,11 @@ inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
 
             auto b = Np.get();
             // if particle a == particle a skip
-            if (a.getKey() == b)
-            {
-                ++Np;
-                continue;
-            };
+            // if (a.getKey() == b)
+            // {
+            //     ++Np;
+            //     continue;
+            // };
             // Get particle propertiesb
             Point<3, double> xb = vd.getPos(b);
 
@@ -540,7 +531,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
             auto b = Np.get();
             // Skip boundary particles only consider FLUID particles
             // for extrapolation of boundary condition
-            if (a.getKey() == b || vd.getProp<type>(b) == BOUNDARY)
+            if (vd.getProp<type>(b) == BOUNDARY)
             {
                 ++Np;
                 continue;
