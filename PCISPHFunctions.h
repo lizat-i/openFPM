@@ -96,7 +96,7 @@ void position_and_velocity_prediction(particles &vd, CellList &NN, double dt)
     auto part = vd.getDomainIterator();
 
     vd.map();
-    vd.ghost_get<rho, velocity, rho_prev, x_pre, velocity_prev>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
     vd.updateCellList(NN);
 
     while (part.isNext())
@@ -279,7 +279,7 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
      because testing with one processor
    */
 
-    vd.ghost_get<rho>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
 
     auto part = vd.getDomainIterator();
 
@@ -365,6 +365,8 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
 
                 // Pressure Smoothing
                 pressureNeighbouring += massb / rhob * Pb * wab;
+
+                kernel += wab;
             }
             ++Np;
         }
@@ -375,6 +377,8 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
         double predicted_Pressure = vd.getProp<Pressure>(a) + delptaP;
         // pressure Smoothing
         double smoothedPressure = predicted_Pressure * intPConst + (1 - intPConst) * pressureNeighbouring;
+        // TODO Pressure clipped
+        // vd.getProp<Pressure>(a) = (smoothedPressure >= 0.0) ? smoothedPressure : 0.0;
         vd.getProp<Pressure>(a) = smoothedPressure;
 
         ++part;
@@ -385,7 +389,7 @@ template <typename CellList>
 inline void resetPosVelDen(particles &vd, CellList &NN)
 {
     auto part = vd.getDomainIterator();
-    vd.ghost_get<Pressure>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
 
     while (part.isNext())
     {
@@ -416,14 +420,14 @@ inline void resetPosVelDen(particles &vd, CellList &NN)
 
     vd.updateCellList(NN);
     vd.map();
-    vd.ghost_get<rho, velocity>(WITH_POSITION);
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
     vd.map();
 }
 
 template <typename CellList>
 inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
 {
-    vd.ghost_get<rho, Pressure, velocity>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
 
     auto part = vd.getDomainIterator();
 
@@ -496,7 +500,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
     auto part = vd.getDomainIterator();
 
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
     vd.updateCellList(NN);
 
     while (part.isNext())
@@ -577,6 +581,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
             }
             ++Np;
         }
+
         // pressure extrapolation
         // scalar product g_ext and rho_dr_wf
         g_wab = rho_dr_wf.get(0) * bodyforce[0] + rho_dr_wf.get(1) * bodyforce[1] + rho_dr_wf.get(2) * bodyforce[2];
@@ -584,11 +589,13 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         double cand_pressure = (p_wab + g_wab) / kernel;
         // double cand_pressure = (p_wab) / kernel;
         //  if kernel empty set pressure zero, otherwise cand pressure
-        //  TODO Boundary Pressure wird hier geklippt
+
+        //  TODO Boundary Pressure & Density
         vd.getProp<Pressure>(a) = (cand_pressure > 0.0) ? cand_pressure : 0.0;
 
         // calculate extrapolated densities
         double cand_density = rho_wab / kernel;
+
         // if kernel is empty set density to reference density
         vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
 
@@ -603,8 +610,8 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 
 void stroemer_verlet_int(particles &vd, double dt)
 {
-    vd.ghost_get<pressure_acc>();
-    
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+
     // list of the particle to remove
     to_remove.clear();
     // particle iterator
@@ -632,6 +639,7 @@ void stroemer_verlet_int(particles &vd, double dt)
             ++part;
             continue;
         }
+        //  TODO Nochmal nacschauen ob diese Integration auch Stroemer Verlet Schema entspricht
 
         // integrate velocity
         vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt;
@@ -643,8 +651,8 @@ void stroemer_verlet_int(particles &vd, double dt)
         vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt * 0.5;
 
         // integrate density
+        //TOFO vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
         double CandidateDensity = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
-        // vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
         vd.template getProp<rho>(a) = CandidateDensity;
 
         // save velocity_prev and rho_prev

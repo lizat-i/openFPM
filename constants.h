@@ -89,7 +89,7 @@ const double bodyforce[3] = {0, 0, -gravity};
 const double maxDensityVariation = 0.01;
 
 // smoothing parameter
-const double intPConst = 0.8;
+const double intPConst = 0.5;
 
 double Xmin = 0.0;
 double Ymin = 0.0;

@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     vd.addComputationCosts(md);
     vd.getDecomposition().decompose();
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity>();
+    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
     auto NN = vd.getCellList(2 * H);
 
     // Decompose domain, map paricles and ghet ghost properties
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         Init_Loop(vd, NN, max_visc);
 
         vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
-
+        
         while (densityError > maxDensityVariation || pcisphIt < 3)
         {
             densityError = 0.0;
@@ -76,12 +76,12 @@ int main(int argc, char *argv[])
             // get max densityError and max_art_visc
             v_cl.max(max_visc);
             v_cl.max(densityError);
-            // if (v_cl.getProcessUnitID() == 0)
-            // {
-            //     outFile << "error :  " << densityError << std::endl;
-            // }
-
             v_cl.execute();
+
+            if (v_cl.getProcessUnitID() == 0 && ((pcisphIt > 0) && (pcisphIt % 15 == 0)))
+            {
+                outFile << "error :  " << densityError << std::endl;
+            }
             ++pcisphIt;
         }
 

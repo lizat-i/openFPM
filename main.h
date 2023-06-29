@@ -219,8 +219,8 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
             double cand_pressure = (p_wab + g_wab) / kernel;
             double cand_density = rho_wab / kernel;
 
-            vd.getProp<rho>(a) = (cand_density > rho_zero) ? cand_density : rho_zero;
-            vd.getProp<Pressure>(a) = (cand_pressure > 0.0) ? cand_pressure : 0.0;
+            vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
+            vd.getProp<Pressure>(a) = (kernel > 0.0) ? cand_pressure : 0.0;
             // vd.getProp<Pressure>(a) = cand_pressure ;
 
             vd.template getProp<velocity>(a)[0] = (kernel > 0.0) ? -v_wab_vectorial[0] / kernel : 0;
@@ -524,11 +524,11 @@ inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt,
     {
         outFile << "pcisphIt :  " << pcisphIt << std::endl;
     }
-    if (nr_timestep % 5 == 0)
+    if (nr_timestep % 50 == 0)
     {
         // sensor_pressure calculation require ghost and update cell-list
         vd.map();
-        vd.ghost_get<>();
+        vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
         vd.updateCellList(NN);
 
         vd.write_frame("output/Geometry", write);
