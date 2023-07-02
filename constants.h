@@ -7,12 +7,15 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
+
 std::ofstream outFile;
 // A constant to indicate boundary particles
 #define BOUNDARY 0
 // A constant to indicate fluid particles
 #define FLUID 1
 const double dp = 0.02;
+
+const double EPS = std::numeric_limits<double>::epsilon() ; 
 // Maximum height of the fluid water
 // is going to be calculated and filled later on
 double h_swl = 0.0;
@@ -82,6 +85,8 @@ const int viscous_acc = 8;
 const int x_pre = 9;
 // position at previous timestep
 const int rho_err = 10;
+// position at previous timestep
+const int Pressure_prev = 10;
 // Gravity or external forces
 const double bodyforce[3] = {0, 0, -gravity};
 

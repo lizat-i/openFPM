@@ -50,15 +50,11 @@ inline void Init_Loop(particles &vd, CellList &NN, double &max_visc)
             {
                 // ... q
                 auto b = Np.get();
-                Point<3, double> xb = vd.getPos(b);
-                if (a.getKey() == b)
-                {
-                    ++Np;
-                    continue;
-                };
 
+                Point<3, double> xb = vd.getPos(b);
                 Point<3, double> vb = vd.getProp<velocity>(b);
                 Point<3, double> dr = xa - xb;
+
                 double rhob = vd.getProp<rho>(b);
                 double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
                 double r2 = norm2(dr);
@@ -96,7 +92,7 @@ void position_and_velocity_prediction(particles &vd, CellList &NN, double dt)
     auto part = vd.getDomainIterator();
 
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
     vd.updateCellList(NN);
 
     while (part.isNext())
@@ -109,24 +105,6 @@ void position_and_velocity_prediction(particles &vd, CellList &NN, double dt)
             ++part;
             continue;
         }
-
-        /*
-
-        Predict velocity and Owerwrite velocity for
-        ALL consecutive Calcuations.
-        from here on velocity is v*
-        and position is x*
-
-        v,x are saved as velocity_prev, and x_prev
-        during integration step.
-
-        when finishing iteration
-        v* and x* are again calculated
-        from starting Point velocity_prev, and x_prev
-
-        did I understand this correctly?
-
-        */
 
         // predict velocity
 
@@ -169,7 +147,7 @@ inline void predictDensity(particles &vd, CellList &NN, double &max_visc, const 
      because testing with one processor
    */
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
     vd.updateCellList(NN);
 
     auto part = vd.getDomainIterator();
@@ -213,13 +191,6 @@ inline void predictDensity(particles &vd, CellList &NN, double &max_visc, const 
         {
             // ... q
             auto b = Np.get();
-            // Skip the iteration if particle a=b
-
-            // if (a.getKey() == b)
-            // {
-            //     ++Np;
-            //     continue;
-            // };
 
             // Get particle properties b
 
@@ -279,7 +250,7 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
      because testing with one processor
    */
 
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
 
     auto part = vd.getDomainIterator();
 
@@ -320,13 +291,6 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
         {
             // ... q
             auto b = Np.get();
-            // Skip the iteration if particle a=b
-
-            // if (a.getKey() == b)
-            // {
-            //     ++Np;
-            //     continue;
-            // };
 
             // Get particle properties b
 
@@ -355,7 +319,7 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
                 gradientSum += massb * DW;
 
                 // Pressure Smoothing
-                pressureNeighbouring += massb / rhob * Pb * wab;
+                pressureNeighbouring += massb / rhob * vd.getProp<Pressure_prev>(a) * wab;
 
                 kernel += wab;
             }
@@ -369,8 +333,8 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
         // pressure Smoothing
         double smoothedPressure = predicted_Pressure * intPConst + (1 - intPConst) * pressureNeighbouring;
         // TODO Pressure clipped
-        // vd.getProp<Pressure>(a) = (smoothedPressure >= 0.0) ? smoothedPressure : 0.0;
-        vd.getProp<Pressure>(a) = smoothedPressure;
+        vd.getProp<Pressure>(a) = (kernel >= 0.0) ? smoothedPressure : 0.0;
+        //vd.getProp<Pressure>(a) = smoothedPressure;
 
         ++part;
     }
@@ -380,7 +344,7 @@ template <typename CellList>
 inline void resetPosVelDen(particles &vd, CellList &NN)
 {
     auto part = vd.getDomainIterator();
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
 
     while (part.isNext())
     {
@@ -411,14 +375,14 @@ inline void resetPosVelDen(particles &vd, CellList &NN)
 
     vd.updateCellList(NN);
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
     vd.map();
 }
 
 template <typename CellList>
 inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
 {
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
 
     auto part = vd.getDomainIterator();
 
@@ -448,12 +412,7 @@ inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
         {
 
             auto b = Np.get();
-            // if particle a == particle a skip
-            // if (a.getKey() == b)
-            // {
-            //     ++Np;
-            //     continue;
-            // };
+
             // Get particle propertiesb
             Point<3, double> xb = vd.getPos(b);
 
@@ -491,7 +450,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
     auto part = vd.getDomainIterator();
 
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
     vd.updateCellList(NN);
 
     while (part.isNext())
@@ -541,8 +500,6 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
             Point<3, double> xb = vd.getPos(b);
             Point<3, double> vb = vd.getProp<velocity>(b);
 
-            // Point<3, double> xb = vd.getProp<x_pre>(b);
-            // Point<3, double> vb = vd.getProp<velocity_prev>(b);
 
             double massb = (vd.getProp<type>(b) == FLUID) ? MassFluid : MassBound;
             double Pb = vd.getProp<Pressure>(b);
@@ -562,7 +519,9 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 
                 // pressure and bodyforce summation
                 p_wab += Pb * wab;
-                rho_dr_wf += wab * rhob * dr;
+                //rho_dr_wf = wab * rhob * dr;
+                
+                g_wab += wab * rhob * dr.get(0) * bodyforce[0] + wab * rhob *dr.get(1) * bodyforce[1] + wab * rhob * dr.get(2) * bodyforce[2];
 
                 // density sumation
                 rho_wab += rhob * wab;
@@ -575,10 +534,10 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 
         // pressure extrapolation
         // scalar product g_ext and rho_dr_wf
-        g_wab = rho_dr_wf.get(0) * bodyforce[0] + rho_dr_wf.get(1) * bodyforce[1] + rho_dr_wf.get(2) * bodyforce[2];
+        
         // calculate candidate pressure
-        double cand_pressure = (p_wab + g_wab) / kernel;
-        // double cand_pressure = (p_wab) / kernel;
+        //double cand_pressure = (p_wab + g_wab) / kernel;
+        double cand_pressure = (p_wab) / kernel;
         //  if kernel empty set pressure zero, otherwise cand pressure
 
         //  TODO Boundary Pressure & Density
@@ -588,7 +547,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         double cand_density = rho_wab / kernel;
 
         // if kernel is empty set density to reference density
-        vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
+        vd.getProp<rho>(a) = (cand_density > rho_zero) ? cand_density : rho_zero;
 
         // set negative velocity
         vd.template getProp<velocity>(a)[0] = (kernel > 0.0) ? -v_wab_vectorial[0] / kernel : 0;
@@ -601,7 +560,7 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
 
 void stroemer_verlet_int(particles &vd, double dt)
 {
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
 
     // list of the particle to remove
     to_remove.clear();
@@ -642,9 +601,13 @@ void stroemer_verlet_int(particles &vd, double dt)
         vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity_prev>(a)[2] + vd.template getProp<velocity>(a)[2]) * dt * 0.5;
 
         // integrate density
-        //TOFO vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
+        // TODO vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
         double CandidateDensity = vd.template getProp<rho_prev>(a) + dt * vd.template getProp<drho>(a);
-        vd.template getProp<rho>(a) = CandidateDensity;
+
+        vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
+        vd.getProp<Pressure>(a) = (vd.getProp<Pressure>(a) > 0.0) ? vd.getProp<Pressure>(a) : 0.0;
+
+        //vd.template getProp<rho>(a) = CandidateDensity;
 
         // save velocity_prev and rho_prev
         vd.template getProp<velocity_prev>(a)[0] = vd.template getProp<velocity>(a)[0];
@@ -654,6 +617,10 @@ void stroemer_verlet_int(particles &vd, double dt)
         vd.template getProp<x_pre>(a)[0] = vd.getPos(a)[0];
         vd.template getProp<x_pre>(a)[1] = vd.getPos(a)[1];
         vd.template getProp<x_pre>(a)[2] = vd.getPos(a)[2];
+        vd.template getProp<Pressure_prev>(a) = vd.getProp<Pressure>(a);
+
+        
+
 
         ++part;
     }

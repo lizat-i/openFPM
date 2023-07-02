@@ -76,10 +76,10 @@ inline void DWab(Point<3, double> &dx, Point<3, double> &DW, double r, bool prin
 {
     const double qq = r / H;
     double qq2 = qq * qq;
-    double fac1 = (c1 * qq + d1 * qq2) / r;
+    double fac1 = (c1 * qq + d1 * qq2) / (r + EPS);
     double b1 = (qq < 1.0) ? 1.0f : 0.0f;
     double wqq = (2.0 - qq);
-    double fac2 = c2 * wqq * wqq / r;
+    double fac2 = c2 * wqq * wqq / (r + EPS);
     double b2 = (qq >= 1.0 && qq < 2.0) ? 1.0f : 0.0f;
     double factor = (b1 * fac1 + b2 * fac2);
     DW.get(0) = factor * dx.get(0);
@@ -524,11 +524,11 @@ inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt,
     {
         outFile << "pcisphIt :  " << pcisphIt << std::endl;
     }
-    if (nr_timestep % 50 == 0)
+    if (nr_timestep % 5 == 0)
     {
         // sensor_pressure calculation require ghost and update cell-list
         vd.map();
-        vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
         vd.updateCellList(NN);
 
         vd.write_frame("output/Geometry", write);
@@ -591,7 +591,8 @@ inline particles setUpDomain()
         vd.getLastProp<x_pre>()[1] = fluid_it.get().get(1);
         vd.getLastProp<x_pre>()[2] = fluid_it.get().get(2);
         vd.template getLastProp<type>() = FLUID;
-        vd.template getLastProp<Pressure>() = 0;   // rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
+        vd.template getLastProp<Pressure>() = 0; // rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
+        vd.template getLastProp<Pressure_prev>() = 0;
         vd.template getLastProp<rho>() = rho_zero; // pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
         vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
         vd.template getLastProp<velocity>()[0] = 0.0;
@@ -651,6 +652,7 @@ inline particles setUpDomain()
 
             vd.template getLastProp<type>() = BOUNDARY;
             vd.template getLastProp<Pressure>() = 0;
+            vd.template getLastProp<Pressure_prev>() = 0;
             vd.template getLastProp<rho>() = rho_zero;
 
             vd.template getLastProp<rho_prev>() = rho_zero;

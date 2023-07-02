@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     vd.addComputationCosts(md);
     vd.getDecomposition().decompose();
     vd.map();
-    vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
     auto NN = vd.getCellList(2 * H);
 
     // Decompose domain, map paricles and ghet ghost properties
@@ -56,11 +56,11 @@ int main(int argc, char *argv[])
         int pcisphIt = 0;
         const double dt = 0.05 * H / 3.0;
 
-        vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
 
         Init_Loop(vd, NN, max_visc);
 
-        vd.ghost_get<type, rho, Pressure, velocity, pressure_acc, viscous_acc>();
+        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
         
         while (densityError > maxDensityVariation || pcisphIt < 3)
         {
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
             v_cl.max(densityError);
             v_cl.execute();
 
-            if (v_cl.getProcessUnitID() == 0 && ((pcisphIt > 0) && (pcisphIt % 15 == 0)))
+            if (v_cl.getProcessUnitID() == 0 && ((pcisphIt > 0) && (pcisphIt % 5 == 0)))
             {
                 outFile << "error :  " << densityError << std::endl;
             }
