@@ -219,13 +219,13 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
             double cand_pressure = (p_wab + g_wab) / kernel;
             double cand_density = rho_wab / kernel;
 
-            vd.getProp<rho>(a) = (kernel > 0.0) ? cand_density : rho_zero;
-            vd.getProp<Pressure>(a) = (kernel > 0.0) ? cand_pressure : 0.0;
+            vd.getProp<rho>(a) = (kernel > EPS) ? cand_density : rho_zero;
+            vd.getProp<Pressure>(a) = (kernel > EPS) ? cand_pressure : 0.0;
             // vd.getProp<Pressure>(a) = cand_pressure ;
 
-            vd.template getProp<velocity>(a)[0] = (kernel > 0.0) ? -v_wab_vectorial[0] / kernel : 0;
-            vd.template getProp<velocity>(a)[1] = (kernel > 0.0) ? -v_wab_vectorial[1] / kernel : 0;
-            vd.template getProp<velocity>(a)[2] = (kernel > 0.0) ? -v_wab_vectorial[2] / kernel : 0;
+            vd.template getProp<velocity>(a)[0] = (kernel > EPS) ? -v_wab_vectorial[0] / kernel : 0;
+            vd.template getProp<velocity>(a)[1] = (kernel > EPS) ? -v_wab_vectorial[1] / kernel : 0;
+            vd.template getProp<velocity>(a)[2] = (kernel > EPS) ? -v_wab_vectorial[2] / kernel : 0;
         }
         else
         {
@@ -288,9 +288,9 @@ inline void calc_forces(particles &vd, CellList &NN, double &max_visc)
                 ++Np;
             }
 
-            vd.getProp<viscous_acc>(a)[0] = (kernel > 0.0) ? viscousFocesTermx : 0.0;
-            vd.getProp<viscous_acc>(a)[1] = (kernel > 0.0) ? viscousFocesTermy : 0.0;
-            vd.getProp<viscous_acc>(a)[2] = (kernel > 0.0) ? viscousFocesTermz : 0.0;
+            vd.getProp<viscous_acc>(a)[0] = (kernel > EPS) ? viscousFocesTermx : 0.0;
+            vd.getProp<viscous_acc>(a)[1] = (kernel > EPS) ? viscousFocesTermy : 0.0;
+            vd.getProp<viscous_acc>(a)[2] = (kernel > EPS) ? viscousFocesTermz : 0.0;
         }
         ++part;
     }
@@ -524,7 +524,7 @@ inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt,
     {
         outFile << "pcisphIt :  " << pcisphIt << std::endl;
     }
-    if (nr_timestep % 5 == 0)
+    if (nr_timestep % 25 == 0)
     {
         // sensor_pressure calculation require ghost and update cell-list
         vd.map();

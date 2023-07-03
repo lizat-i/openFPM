@@ -78,9 +78,9 @@ inline void Init_Loop(particles &vd, CellList &NN, double &max_visc)
                 ++Np;
             }
 
-            vd.getProp<viscous_acc>(a)[0] = (kernel > 0.0) ? viscousFocesTermx : 0.0;
-            vd.getProp<viscous_acc>(a)[1] = (kernel > 0.0) ? viscousFocesTermy : 0.0;
-            vd.getProp<viscous_acc>(a)[2] = (kernel > 0.0) ? viscousFocesTermz : 0.0;
+            vd.getProp<viscous_acc>(a)[0] = (kernel > EPS) ? viscousFocesTermx : 0.0;
+            vd.getProp<viscous_acc>(a)[1] = (kernel > EPS) ? viscousFocesTermy : 0.0;
+            vd.getProp<viscous_acc>(a)[2] = (kernel > EPS) ? viscousFocesTermz : 0.0;
         }
         ++part;
     }
@@ -108,15 +108,15 @@ void position_and_velocity_prediction(particles &vd, CellList &NN, double dt)
 
         // predict velocity
 
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<pressure_acc>(a)[1] + vd.template getProp<viscous_acc>(a)[1] + bodyforce[1]) * dt;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<pressure_acc>(a)[2] + vd.template getProp<viscous_acc>(a)[2] + bodyforce[2]) * dt;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity>(a)[1] + (vd.template getProp<pressure_acc>(a)[1] + vd.template getProp<viscous_acc>(a)[1] + bodyforce[1]) * dt;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity>(a)[2] + (vd.template getProp<pressure_acc>(a)[2] + vd.template getProp<viscous_acc>(a)[2] + bodyforce[2]) * dt;
 
         // predict position
 
-        vd.getPos(a)[0] = vd.template getProp<x_pre>(a)[0] + (vd.template getProp<velocity>(a)[0]) * dt;
-        vd.getPos(a)[1] = vd.template getProp<x_pre>(a)[1] + (vd.template getProp<velocity>(a)[1]) * dt;
-        vd.getPos(a)[2] = vd.template getProp<x_pre>(a)[2] + (vd.template getProp<velocity>(a)[2]) * dt;
+        vd.getPos(a)[0] = vd.getPos(a)[0] + (vd.template getProp<velocity>(a)[0]) * dt;
+        vd.getPos(a)[1] = vd.getPos(a)[1] + (vd.template getProp<velocity>(a)[1]) * dt;
+        vd.getPos(a)[2] = vd.getPos(a)[2] + (vd.template getProp<velocity>(a)[2]) * dt;
 
         ++part;
 
@@ -333,7 +333,7 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
         // pressure Smoothing
         double smoothedPressure = predicted_Pressure * intPConst + (1 - intPConst) * pressureNeighbouring;
         // TODO Pressure clipped
-        vd.getProp<Pressure>(a) = (kernel >= 0.0) ? smoothedPressure : 0.0;
+        vd.getProp<Pressure>(a) = (kernel > EPS) ? smoothedPressure : 0.0;
         //vd.getProp<Pressure>(a) = smoothedPressure;
 
         ++part;
@@ -537,22 +537,22 @@ inline void extrapolateBoundaries(particles &vd, CellList &NN, double &max_visc)
         
         // calculate candidate pressure
         //double cand_pressure = (p_wab + g_wab) / kernel;
-        double cand_pressure = (p_wab) / kernel;
+        double cand_pressure = (p_wab) / (kernel+EPS);
         //  if kernel empty set pressure zero, otherwise cand pressure
 
         //  TODO Boundary Pressure & Density
-        vd.getProp<Pressure>(a) = (cand_pressure > 0.0) ? cand_pressure : 0.0;
+        vd.getProp<Pressure>(a) = (cand_pressure > EPS) ? cand_pressure : 0.0;
 
         // calculate extrapolated densities
-        double cand_density = rho_wab / kernel;
+        double cand_density = rho_wab / (kernel+EPS);
 
         // if kernel is empty set density to reference density
         vd.getProp<rho>(a) = (cand_density > rho_zero) ? cand_density : rho_zero;
 
         // set negative velocity
-        vd.template getProp<velocity>(a)[0] = (kernel > 0.0) ? -v_wab_vectorial[0] / kernel : 0;
-        vd.template getProp<velocity>(a)[1] = (kernel > 0.0) ? -v_wab_vectorial[1] / kernel : 0;
-        vd.template getProp<velocity>(a)[2] = (kernel > 0.0) ? -v_wab_vectorial[2] / kernel : 0;
+        vd.template getProp<velocity>(a)[0] = (kernel > EPS) ? -v_wab_vectorial[0] / (kernel+EPS) : 0;
+        vd.template getProp<velocity>(a)[1] = (kernel > EPS) ? -v_wab_vectorial[1] / (kernel+EPS) : 0;
+        vd.template getProp<velocity>(a)[2] = (kernel > EPS) ? -v_wab_vectorial[2] / (kernel+EPS) : 0;
 
         ++part;
     }

@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
             v_cl.max(densityError);
             v_cl.execute();
 
-            if (v_cl.getProcessUnitID() == 0 && ((pcisphIt > 0) && (pcisphIt % 5 == 0)))
+            if (v_cl.getProcessUnitID() == 0 && ((pcisphIt > 0) && (pcisphIt % 25 == 0)))
             {
                 outFile << "error :  " << densityError << std::endl;
             }
