@@ -77,8 +77,9 @@ const int drho = 4;
 const int pressure_acc = 5;
 // velocity
 const int velocity = 6;
-// velocity at previous step
-const int velocity_prev = 7;
+// velocity at this , not iterated step
+const int velocity_t = 7;
+
 // calculated viscous Force
 const int viscous_acc = 8;
 // position at previous timestep
@@ -87,6 +88,8 @@ const int x_pre = 9;
 const int rho_err = 10;
 // position at previous timestep
 const int Pressure_prev = 10;
+// velocity at previous step
+const int velocity_t_m1 = 11;
 // Gravity or external forces
 const double bodyforce[3] = {0, 0, -gravity};
 

@@ -25,7 +25,7 @@ sph_dlb: $(OBJ)
 all: sph_dlb
 
 run: sph_dlb_test
-	mpirun --allow-run-as-root --oversubscribe -np 2 ./sph_dlb
+	mpirun --allow-run-as-root --oversubscribe -np 1 ./sph_dlb
 
 .PHONY: clean all run
 
@@ -34,4 +34,5 @@ clean:
 	rm -f *.o *~ core sph_dlb log
 	cd  output/
 	rm -rf output/*.vtp output/*.pvtp
+	rm -rf output/modified_files/*.vtp output/modified_files/*.pvtp
 

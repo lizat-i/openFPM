@@ -15,8 +15,8 @@ int main(int argc, char *argv[])
 
     // Now that we fill the vector with particles
 
-    ModelCustom md;
-    vd.addComputationCosts(md);
+    // ModelCustom md;
+    // vd.addComputationCosts(md);
     vd.getDecomposition().decompose();
     vd.map();
     vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
@@ -38,16 +38,16 @@ int main(int argc, char *argv[])
         Vcluster<> &v_cl = create_vcluster();
         timer it_time;
         it_reb++;
-        if (it_reb == 200)
-        {
-            vd.map();
-            it_reb = 0;
-            ModelCustom md;
-            vd.addComputationCosts(md);
-            vd.getDecomposition().decompose();
-            if (v_cl.getProcessUnitID() == 0)
-                std::cout << "REBALANCED " << std::endl;
-        }
+        // if (it_reb == 200)
+        // {
+        //     vd.map();
+        //     it_reb = 0;
+        //     ModelCustom md;
+        //     vd.addComputationCosts(md);
+        //     vd.getDecomposition().decompose();
+        //     if (v_cl.getProcessUnitID() == 0)
+        //         std::cout << "REBALANCED " << std::endl;
+        // }
         vd.map();
 
         // initializeParameter
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
             position_and_velocity_prediction(vd, NN, dt);
             predictDensity(vd, NN, max_visc, dt, densityError);
             predictPressure(vd, NN, max_visc, dt, densityError);
-            resetPosVelDen(vd, NN);
+            //resetPosVelDen(vd, NN);
             extrapolateBoundaries(vd, NN, max_visc);
             calc_Pressure_forces(vd, NN, max_visc);
 
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
             ++pcisphIt;
         }
 
-        stroemer_verlet_int(vd, dt);
+        euler_integration_Bauinger(vd, dt);
         t += dt;
         nr_timestep++;
 
