@@ -401,7 +401,7 @@ void euler_int(particles &vd, double dt)
     // list of the particle to remove
     to_remove.clear();
     // particle iterator
-    auto part = vd.getDomainIterator();
+    auto part = vd.getDomainIterator(); 
     double dt205 = dt * dt * 0.5;
     double dt2 = dt * 2.0;
     // For each particle ...

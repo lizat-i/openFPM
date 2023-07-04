@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         Init_Loop(vd, NN, max_visc);
 
         vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
-        
+
         while (densityError > maxDensityVariation || pcisphIt < 3)
         {
             densityError = 0.0;
@@ -69,7 +69,6 @@ int main(int argc, char *argv[])
             position_and_velocity_prediction(vd, NN, dt);
             predictDensity(vd, NN, max_visc, dt, densityError);
             predictPressure(vd, NN, max_visc, dt, densityError);
-            //resetPosVelDen(vd, NN);
             extrapolateBoundaries(vd, NN, max_visc);
             calc_Pressure_forces(vd, NN, max_visc);
 
@@ -84,8 +83,15 @@ int main(int argc, char *argv[])
             }
             ++pcisphIt;
         }
-
+        // if (t < 10 * dt)
+        // {
         euler_integration_Bauinger(vd, dt);
+        // }
+        // else
+        // {
+        // verlet_int_bauinger(vd, dt);
+        // }
+
         t += dt;
         nr_timestep++;
 

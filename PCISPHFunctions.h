@@ -337,10 +337,10 @@ inline void predictPressure(particles &vd, CellList &NN, double &max_visc, const
 
         // pressure Smoothing
         double smoothedPressure = predicted_Pressure * intPConst + (1 - intPConst) * pressureNeighbouring;
-
         // TODO Pressure clipped
-        vd.getProp<Pressure>(a) = (smoothedPressure > EPS) ? smoothedPressure : 0.0;
-        // vd.getProp<Pressure>(a) = smoothedPressure;
+        //vd.getProp<Pressure>(a) = (smoothedPressure > EPS) ? smoothedPressure : 0.0;
+
+        vd.getProp<Pressure>(a) = smoothedPressure;
 
         ++part;
     }
@@ -438,6 +438,8 @@ inline void calc_Pressure_forces(particles &vd, CellList &NN, double &max_visc)
                 Point<3, double> DW;
                 DWab(dr, DW, r, false);
 
+                // TODO backgroundPressure 
+                
                 double factor = -massb * ((Pa + Pb) / (rhoa * rhob));
 
                 vd.getProp<pressure_acc>(a)[0] += factor * DW.get(0);
@@ -596,7 +598,9 @@ void euler_integration_Bauinger(particles &vd, double dt)
             ++part;
             continue;
         }
-
+        double velX = vd.template getProp<velocity_t>(a)[0];
+        double velY = vd.template getProp<velocity_t>(a)[1];
+        double velZ = vd.template getProp<velocity_t>(a)[2];
         // integrate velocity
         vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_t>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt;
         vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_t>(a)[1] + (vd.template getProp<pressure_acc>(a)[1] + vd.template getProp<viscous_acc>(a)[1] + bodyforce[1]) * dt;
@@ -615,7 +619,7 @@ void euler_integration_Bauinger(particles &vd, double dt)
         // vd.getProp<Pressure>(a) = (vd.getProp<Pressure>(a) > 0.0) ? vd.getProp<Pressure>(a) : 0.0;
         // TODO DEBUG
 
-        vd.getProp<Pressure>(a) = (vd.getProp<Pressure>(a) > 0.0) ? vd.getProp<Pressure>(a) : 0.0;
+        vd.getProp<Pressure>(a) = (vd.getProp<Pressure>(a) > EPS) ? vd.getProp<Pressure>(a) : 0.0;
 
         // vd.template getProp<rho>(a) = CandidateDensity;
 
@@ -623,6 +627,11 @@ void euler_integration_Bauinger(particles &vd, double dt)
         vd.template getProp<velocity_t>(a)[0] = vd.template getProp<velocity>(a)[0];
         vd.template getProp<velocity_t>(a)[1] = vd.template getProp<velocity>(a)[1];
         vd.template getProp<velocity_t>(a)[2] = vd.template getProp<velocity>(a)[2];
+
+        vd.template getProp<velocity_t_m1>(a)[0] = velX;
+        vd.template getProp<velocity_t_m1>(a)[1] = velY;
+        vd.template getProp<velocity_t_m1>(a)[2] = velZ;
+
         vd.template getProp<rho_prev>(a) = vd.template getProp<rho>(a);
         vd.template getProp<x_pre>(a)[0] = vd.getPos(a)[0];
         vd.template getProp<x_pre>(a)[1] = vd.getPos(a)[1];
