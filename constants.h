@@ -9,6 +9,7 @@
 #include <fstream>
 
 std::ofstream outFile;
+std::ofstream pressureLogger;
 // A constant to indicate boundary particles
 #define BOUNDARY 0
 // A constant to indicate fluid particles
@@ -48,7 +49,8 @@ const double t_end = 0.001;
 const double t_end = 4.0;
 #endif
 // Gravity acceleration
-const double gravity = 9.81;
+//const double gravity = 9.81;
+const double gravity = 0.0;
 
 // Filled later require h_swl, it is b in the formulas
 double B = 0.0;
@@ -77,9 +79,8 @@ const int drho = 4;
 const int pressure_acc = 5;
 // velocity
 const int velocity = 6;
-// velocity at this , not iterated step
-const int velocity_t = 7;
-
+// velocity at previous step
+const int velocity_prev = 7;
 // calculated viscous Force
 const int viscous_acc = 8;
 // position at previous timestep
@@ -87,9 +88,7 @@ const int x_pre = 9;
 // position at previous timestep
 const int rho_err = 10;
 // position at previous timestep
-const int Pressure_prev = 10;
-// velocity at previous step
-const int velocity_t_m1 = 11;
+const int Pressure_prev = 11;
 // Gravity or external forces
 const double bodyforce[3] = {0, 0, -gravity};
 
@@ -98,6 +97,9 @@ const double maxDensityVariation = 0.01;
 
 // smoothing parameter
 const double intPConst = 0.5;
+
+// backGroundPressure parameter
+const double Pbackground = 0.0;
 
 double Xmin = 0.0;
 double Ymin = 0.0;

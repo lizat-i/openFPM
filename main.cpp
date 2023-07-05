@@ -7,6 +7,7 @@ int main(int argc, char *argv[])
 
     // std::ofstream outFile;
     outFile.open("logfile.txt", std::ios_base::app);
+    pressureLogger.open("pressureLogger.txt", std::ios_base::app);
 
     // initialize the library
     openfpm_init(&argc, &argv);
@@ -15,11 +16,11 @@ int main(int argc, char *argv[])
 
     // Now that we fill the vector with particles
 
-    // ModelCustom md;
-    // vd.addComputationCosts(md);
+    ModelCustom md;
+    vd.addComputationCosts(md);
     vd.getDecomposition().decompose();
     vd.map();
-    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
+    vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, velocity_prev, pressure_acc, viscous_acc>();
     auto NN = vd.getCellList(2 * H);
 
     // Decompose domain, map paricles and ghet ghost properties
@@ -38,37 +39,43 @@ int main(int argc, char *argv[])
         Vcluster<> &v_cl = create_vcluster();
         timer it_time;
         it_reb++;
-        // if (it_reb == 200)
-        // {
-        //     vd.map();
-        //     it_reb = 0;
-        //     ModelCustom md;
-        //     vd.addComputationCosts(md);
-        //     vd.getDecomposition().decompose();
-        //     if (v_cl.getProcessUnitID() == 0)
-        //         std::cout << "REBALANCED " << std::endl;
-        // }
+        if (it_reb == 200)
+        {
+            vd.map();
+            it_reb = 0;
+            ModelCustom md;
+            vd.addComputationCosts(md);
+            vd.getDecomposition().decompose();
+            if (v_cl.getProcessUnitID() == 0)
+                std::cout << "REBALANCED " << std::endl;
+        }
         vd.map();
 
         // initializeParameter
         double max_visc = 0.0;
         double densityError = 0.0;
         int pcisphIt = 0;
+        double maxShephard = 0.0;
+        double beta         = 0.0;
         const double dt = 0.05 * H / 3.0;
 
-        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
+        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, velocity_prev, pressure_acc, viscous_acc>();
 
         Init_Loop(vd, NN, max_visc);
 
-        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
+        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, velocity_prev, pressure_acc, viscous_acc>();
 
         while (densityError > maxDensityVariation || pcisphIt < 3)
         {
             densityError = 0.0;
+            maxShephard = 0.0;
+            beta        = 0.0;
 
+            predictBeta(vd, NN, dt, maxShephard,beta);
             position_and_velocity_prediction(vd, NN, dt);
             predictDensity(vd, NN, max_visc, dt, densityError);
-            predictPressure(vd, NN, max_visc, dt, densityError);
+            predictPressure(vd, NN, max_visc, dt, densityError,beta);
+            smoothPressure(vd, NN, max_visc, dt, densityError);
             extrapolateBoundaries(vd, NN, max_visc);
             calc_Pressure_forces(vd, NN, max_visc);
 
@@ -83,15 +90,8 @@ int main(int argc, char *argv[])
             }
             ++pcisphIt;
         }
-        // if (t < 10 * dt)
-        // {
-        euler_integration_Bauinger(vd, dt);
-        // }
-        // else
-        // {
-        // verlet_int_bauinger(vd, dt);
-        // }
 
+        euler_int_PCISPH(vd, dt);
         t += dt;
         nr_timestep++;
 

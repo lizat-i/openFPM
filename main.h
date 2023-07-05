@@ -8,11 +8,11 @@
 #include <fstream>
 #include "constants.h"
 
-typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3],  double ,  double[3]    >> particles;
-//                                        |      |        |          |            |            |         |            |           |                   |            
-//                                        |      |        |          |            |            |         |            |           |                   |            
-//                                      type   density   density    Pressure    delta       force      velocity    velocity    position            position        
-//                                                       at n-1                 density                             at n - 1    at n - 1            at n - 1       
+typedef vector_dist<3, double, aggregate<size_t, double, double, double, double, double[3], double[3], double[3], double[3], double[3], double,double>> particles;
+//                                        |      |        |          |            |            |         |            |           |
+//                                        |      |        |          |            |            |         |            |           |
+//                                      type   density   density    Pressure    delta       force      velocity    velocity    position
+//                                                       at n-1                 density                             at n - 1    at n - 1
 
 struct ModelCustom
 {
@@ -58,7 +58,7 @@ inline void EqState(particles &vd)
 const double a2 = 1.0 / M_PI / H / H / H;
 inline double Wab(double r)
 {
-    r /= H;
+    r *= 1/H;
     if (r < 1.0)
         return (1.0 - 3.0 / 2.0 * r * r + 3.0 / 4.0 * r * r * r) * a2;
     else if (r < 2.0)
@@ -378,16 +378,16 @@ void verlet_int(particles &vd, double dt)
         double velZ = vd.template getProp<velocity>(a)[2];
         double rhop = vd.template getProp<rho>(a);
 
-        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_t>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt2;
-        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_t>(a)[1] + (vd.template getProp<pressure_acc>(a)[1] + vd.template getProp<viscous_acc>(a)[1] + bodyforce[1]) * dt2;
-        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_t>(a)[2] + (vd.template getProp<pressure_acc>(a)[2] + vd.template getProp<viscous_acc>(a)[2] + bodyforce[2]) * dt2;
+        vd.template getProp<velocity>(a)[0] = vd.template getProp<velocity_prev>(a)[0] + (vd.template getProp<pressure_acc>(a)[0] + vd.template getProp<viscous_acc>(a)[0] + bodyforce[0]) * dt2;
+        vd.template getProp<velocity>(a)[1] = vd.template getProp<velocity_prev>(a)[1] + (vd.template getProp<pressure_acc>(a)[1] + vd.template getProp<viscous_acc>(a)[1] + bodyforce[1]) * dt2;
+        vd.template getProp<velocity>(a)[2] = vd.template getProp<velocity_prev>(a)[2] + (vd.template getProp<pressure_acc>(a)[2] + vd.template getProp<viscous_acc>(a)[2] + bodyforce[2]) * dt2;
 
         double CandidateDensity = vd.template getProp<rho_prev>(a) + dt2 * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
 
-        vd.template getProp<velocity_t>(a)[0] = velX;
-        vd.template getProp<velocity_t>(a)[1] = velY;
-        vd.template getProp<velocity_t>(a)[2] = velZ;
+        vd.template getProp<velocity_prev>(a)[0] = velX;
+        vd.template getProp<velocity_prev>(a)[1] = velY;
+        vd.template getProp<velocity_prev>(a)[2] = velZ;
         vd.template getProp<rho_prev>(a) = rhop;
         ++part;
     }
@@ -401,7 +401,7 @@ void euler_int(particles &vd, double dt)
     // list of the particle to remove
     to_remove.clear();
     // particle iterator
-    auto part = vd.getDomainIterator(); 
+    auto part = vd.getDomainIterator();
     double dt205 = dt * dt * 0.5;
     double dt2 = dt * 2.0;
     // For each particle ...
@@ -442,9 +442,9 @@ void euler_int(particles &vd, double dt)
         double CandidateDensity = vd.template getProp<rho>(a) + dt * vd.template getProp<drho>(a);
         vd.template getProp<rho>(a) = (CandidateDensity > rho_zero) ? CandidateDensity : rho_zero;
 
-        vd.template getProp<velocity_t>(a)[0] = velX;
-        vd.template getProp<velocity_t>(a)[1] = velY;
-        vd.template getProp<velocity_t>(a)[2] = velZ;
+        vd.template getProp<velocity_prev>(a)[0] = velX;
+        vd.template getProp<velocity_prev>(a)[1] = velY;
+        vd.template getProp<velocity_prev>(a)[2] = velZ;
         vd.template getProp<rho_prev>(a) = rhop;
         ++part;
     }
@@ -528,7 +528,7 @@ inline void printAndLog(particles &vd, CellList &NN, size_t &write, size_t &cnt,
     {
         // sensor_pressure calculation require ghost and update cell-list
         vd.map();
-        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, pressure_acc, viscous_acc>();
+        vd.ghost_get<type, rho, Pressure, Pressure_prev, velocity, velocity_prev,pressure_acc, viscous_acc>();
         vd.updateCellList(NN);
 
         vd.write_frame("output/Geometry", write);
@@ -591,21 +591,16 @@ inline particles setUpDomain()
         vd.getLastProp<x_pre>()[1] = fluid_it.get().get(1);
         vd.getLastProp<x_pre>()[2] = fluid_it.get().get(2);
         vd.template getLastProp<type>() = FLUID;
-        vd.template getLastProp<Pressure>() = rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
-        vd.template getLastProp<Pressure_prev>() = 0;
+        vd.template getLastProp<Pressure>() =  Pbackground;// rho_zero * gravity * (max_fluid_height - fluid_it.get().get(2));
+        vd.template getLastProp<Pressure_prev>() = Pbackground;
         vd.template getLastProp<rho>() = rho_zero; // pow(vd.template getLastProp<Pressure>() / B + 1, 1.0 / gamma_) * rho_zero;
         vd.template getLastProp<rho_prev>() = vd.template getLastProp<rho>();
         vd.template getLastProp<velocity>()[0] = 0.0;
         vd.template getLastProp<velocity>()[1] = 0.0;
         vd.template getLastProp<velocity>()[2] = 0.0;
-
-        vd.template getLastProp<velocity_t_m1>()[0] = 0.0;
-        vd.template getLastProp<velocity_t_m1>()[1] = 0.0;
-        vd.template getLastProp<velocity_t_m1>()[2] = 0.0;
-
-        vd.template getLastProp<velocity_t>()[0] = 0.0;
-        vd.template getLastProp<velocity_t>()[1] = 0.0;
-        vd.template getLastProp<velocity_t>()[2] = 0.0;
+        vd.template getLastProp<velocity_prev>()[0] = 0.0;
+        vd.template getLastProp<velocity_prev>()[1] = 0.0;
+        vd.template getLastProp<velocity_prev>()[2] = 0.0;
         vd.template getLastProp<rho_err>() = 0.0;
 
         // vd.template getLastProp<viscous_acc>()[0] = 0.0;
@@ -656,8 +651,8 @@ inline particles setUpDomain()
             vd.getLastProp<x_pre>()[2] = toFill.get().get(2);
 
             vd.template getLastProp<type>() = BOUNDARY;
-            vd.template getLastProp<Pressure>() = 0;
-            vd.template getLastProp<Pressure_prev>() = 0;
+            vd.template getLastProp<Pressure>() = Pbackground;
+            vd.template getLastProp<Pressure_prev>() = Pbackground;
             vd.template getLastProp<rho>() = rho_zero;
 
             vd.template getLastProp<rho_prev>() = rho_zero;
@@ -665,14 +660,9 @@ inline particles setUpDomain()
             vd.template getLastProp<velocity>()[1] = 0.0;
             vd.template getLastProp<velocity>()[2] = 0.0;
 
-            vd.template getLastProp<velocity_t>()[0] = 0.0;
-            vd.template getLastProp<velocity_t>()[1] = 0.0;
-            vd.template getLastProp<velocity_t>()[2] = 0.0;
-
-            vd.template getLastProp<velocity_t_m1>()[0] = 0.0;
-            vd.template getLastProp<velocity_t_m1>()[1] = 0.0;
-            vd.template getLastProp<velocity_t_m1>()[2] = 0.0;
-
+            vd.template getLastProp<velocity_prev>()[0] = 0.0;
+            vd.template getLastProp<velocity_prev>()[1] = 0.0;
+            vd.template getLastProp<velocity_prev>()[2] = 0.0;
             vd.template getLastProp<rho_err>() = 0.0;
             // vd.template getLastProp<viscous_acc>()[0] = 0.0;
             // vd.template getLastProp<viscous_acc>()[1] = 0.0;

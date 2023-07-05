@@ -35,4 +35,4 @@ clean:
 	cd  output/
 	rm -rf output/*.vtp output/*.pvtp
 	rm -rf output/modified_files/*.vtp output/modified_files/*.pvtp
-
+	rm -rf pressureLogger.txt
